@@ -1,0 +1,255 @@
+/**
+ * Core Philosophy: This ruleset implements a Database-Based Access Control (DBAC) model for a corporate medical application.
+ * Authorization is primarily determined by a user's 'rol' (role) stored within their document in the /usuariosAplicacion collection.
+ * There are three main roles:
+ *  - PACIENTE: Can only access their own associated medical data.
+ *  - MEDICO: Has broad read and write access to all patient-related clinical data.
+ *  - ADMIN: Has broad access similar to a MEDICO, with additional permissions to manage user and doctor records.
+ *
+ * Data Structure: The database uses a flat, root-level collection structure. This design avoids complex hierarchical security rules
+ * and improves performance by minimizing the need for nested 'get' calls. Each collection represents a distinct data entity.
+ *
+ * Key Security Decisions:
+ * - User and medical professional data (/pacientes, /medicos) is managed by ADMINs.
+ * - Patients can create their own wellness checks and initial clinical cases, but only medical staff (MEDICO, ADMIN) can create
+ *   official medical records like appointments, attentions, exams, and follow-ups.
+ * - All sensitive patient data collections cannot be listed by patients to prevent data leakage. Only MEDICO and ADMIN roles can list these records.
+ * - The /empleadosEmp2024 collection is treated as read-only data, likely synchronized from an external system.
+ *
+ * Developer Responsibility:
+ * The security of this application critically depends on the correct creation of a `/usuariosAplicacion/{userId}` document for each user.
+ * Your backend logic MUST ensure that when a user signs up, this document is created with the correct `rol` and, if applicable, the
+ * corresponding `idPaciente` or `idMedico`. This document is the source of truth for all subsequent authorization decisions.
+ */
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // --------------------------------
+    // Helper Functions
+    // --------------------------------
+
+    /**
+     * Returns the signed-in user's profile document from the 'usuariosAplicacion' collection.
+     * This is the foundation of the Database-Based Access Control (DBAC) model.
+     */
+    function userProfile() {
+      return get(/databases/$(database)/documents/usuariosAplicacion/$(request.auth.uid));
+    }
+
+    /**
+     * Returns the role ('PACIENTE', 'MEDICO', 'ADMIN') of the signed-in user from their profile.
+     */
+    function userRole() {
+      return userProfile().data.rol;
+    }
+
+    /**
+     * Checks if a user is signed in.
+     */
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    /**
+     * Checks if the request comes from an authenticated user whose UID matches the document's ID.
+     */
+    function isOwner(userId) {
+      return request.auth.uid == userId;
+    }
+
+    /**
+     * Checks if the document being accessed already exists.
+     * Crucial for protecting against writes on non-existent paths.
+     */
+    function isExistingDoc() {
+      return resource != null;
+    }
+
+    /**
+     * Checks if the signed-in user has the 'ADMIN' role.
+     */
+    function isAdmin() {
+      return isSignedIn() && userRole() == 'ADMIN';
+    }
+
+    /**
+     * Checks if the signed-in user has the 'MEDICO' role.
+     */
+    function isMedico() {
+      return isSignedIn() && userRole() == 'MEDICO';
+    }
+
+    /**
+     * Checks if the signed-in user is a patient and their profile's 'idPaciente'
+     * matches the provided patient ID.
+     */
+    function isOwnPaciente(pacienteId) {
+      return isSignedIn() && userProfile().data.idPaciente == pacienteId;
+    }
+
+    // --------------------------------
+    // Collection Rules
+    // --------------------------------
+
+    /**
+     * @description Manages application user profiles. This collection should be managed via a backend API. Direct client writes are disabled.
+     * @path /usuariosAplicacion/{idUsuario}
+     * @principle Centralize user management in the backend to ensure data consistency and security.
+     */
+    match /usuariosAplicacion/{idUsuario} {
+      allow read: if isSignedIn(); // Allow reading for role checks, etc.
+      allow write: if false; // All writes must go through the API.
+    }
+
+    /**
+     * @description Stores patient information. This collection should be managed via a backend API. Direct client writes are disabled.
+     * @path /pacientes/{idPaciente}
+     * @principle Centralize patient data management.
+     */
+    match /pacientes/{idPaciente} {
+      allow read: if isSignedIn(); // Broad read for now, can be tightened
+      allow write: if false; // All writes must go through the API.
+    }
+
+    /**
+     * @description Stores doctor information. This collection should be managed via a backend API. Direct client writes are disabled.
+     * @path /medicos/{idMedico}
+     * @principle Centralize doctor data management.
+     */
+    match /medicos/{idMedico} {
+      allow read: if isSignedIn();
+      allow write: if false; // All writes must go through the API.
+    }
+
+    /**
+     * @description Stores patient-submitted wellness checks. Patients can create their own checks. Doctors and admins have read-only access.
+     * @path /chequeosBienestar/{idChequeo}
+     * @allow (create) A patient creating a wellness check for themselves, ensuring the `idPaciente` in the document matches their profile.
+     * @deny (update) A patient trying to change the `idPaciente` on an existing check.
+     * @principle Validates relational integrity to ensure patients can only create records for themselves.
+     */
+    match /chequeosBienestar/{idChequeo} {
+      allow get: if isOwnPaciente(resource.data.idPaciente) || isMedico() || isAdmin();
+      allow list: if isMedico() || isAdmin();
+      allow create: if isOwnPaciente(request.resource.data.idPaciente);
+      allow update: if isOwnPaciente(resource.data.idPaciente) && isExistingDoc() && request.resource.data.idPaciente == resource.data.idPaciente;
+      allow delete: if isOwnPaciente(resource.data.idPaciente) && isExistingDoc();
+    }
+
+    /**
+     * @description Stores clinical cases. Patients can create and view their own cases. Doctors and admins have broader access.
+     * @path /casosClinicos/{idCaso}
+     * @allow (create) A patient creating a clinical case, linking it to their own `idPaciente`.
+     * @deny (delete) A patient trying to delete a clinical case (should be archived by a doctor/admin).
+     * @principle Enforces ownership on creation and allows medical staff to manage the case lifecycle.
+     */
+    match /casosClinicos/{idCaso} {
+      allow get: if isOwnPaciente(resource.data.idPaciente) || isMedico() || isAdmin();
+      allow list: if isMedico() || isAdmin();
+      allow create: if isOwnPaciente(request.resource.data.idPaciente);
+      allow update: if (isOwnPaciente(resource.data.idPaciente) || isMedico() || isAdmin()) && isExistingDoc() && request.resource.data.idPaciente == resource.data.idPaciente;
+      allow delete: if (isMedico() || isAdmin()) && isExistingDoc();
+    }
+
+    /**
+     * @description Stores medical appointments. Readable by the involved patient, doctor, or an admin. Writable only by medical staff.
+     * @path /citasMedicas/{idCita}
+     * @allow (get) A patient viewing their own appointment details.
+     * @deny (create) A patient trying to create a medical appointment directly.
+     * @principle Access is granted to collaborators (patient, doctor) while write operations are restricted to medical professionals.
+     */
+    match /citasMedicas/{idCita} {
+      allow get: if isOwnPaciente(resource.data.idPaciente) || isMedico() || isAdmin();
+      allow list: if isMedico() || isAdmin();
+      allow create: if isMedico() || isAdmin();
+      allow update: if (isMedico() || isAdmin()) && isExistingDoc();
+      allow delete: if (isMedico() || isAdmin()) && isExistingDoc();
+    }
+
+    /**
+     * @description Stores records of medical care provided. This is highly sensitive. Readable by the patient; writable only by medical staff.
+     * @path /atencionesMedicas/{idAtencion}
+     * @allow (get) A patient viewing a medical attention record linked to one of their clinical cases.
+     * @deny (create, update, delete) A patient trying to modify their own medical attention record.
+     * @principle Protects the integrity of clinical records by restricting writes to authorized medical personnel.
+     */
+    match /atencionesMedicas/{idAtencion} {
+      allow get: if isOwnPaciente(get(/databases/$(database)/documents/casosClinicos/$(resource.data.idCaso)).data.idPaciente) || isMedico() || isAdmin();
+      allow list: if isMedico() || isAdmin();
+      allow create: if isMedico() || isAdmin();
+      allow update: if (isMedico() || isAdmin()) && isExistingDoc();
+      allow delete: if (isMedico() || isAdmin()) && isExistingDoc();
+    }
+
+    /**
+     * @description Stores results of medical exams. Readable by the patient; writable only by medical staff.
+     * @path /examenesMedicos/{idExamen}
+     * @allow (get) A patient viewing their exam results.
+     * @deny (create) A patient trying to upload their own exam results.
+     * @principle Ensures that official medical exam records are created and managed only by trusted staff.
+     */
+    match /examenesMedicos/{idExamen} {
+      allow get: if isOwnPaciente(resource.data.idPaciente) || isMedico() || isAdmin();
+      allow list: if isMedico() || isAdmin();
+      allow create: if isMedico() || isAdmin();
+      allow update: if (isMedico() || isAdmin()) && isExistingDoc();
+      allow delete: if (isMedico() || isAdmin()) && isExistingDoc();
+    }
+
+    /**
+     * @description Stores patient follow-up notes and schedules. Readable by the patient; writable only by medical staff.
+     * @path /seguimientosPacientes/{idSeguimiento}
+     * @allow (get) A patient checking the notes from their last follow-up call.
+     * @deny (update) A patient trying to change the status of their follow-up.
+     * @principle Secures the follow-up process, ensuring it's managed by the medical team.
+     */
+    match /seguimientosPacientes/{idSeguimiento} {
+      allow get: if isOwnPaciente(resource.data.idPaciente) || isMedico() || isAdmin();
+      allow list: if isMedico() || isAdmin();
+      allow create: if isMedico() || isAdmin();
+      allow update: if (isMedico() || isAdmin()) && isExistingDoc();
+      allow delete: if (isMedico() || isAdmin()) && isExistingDoc();
+    }
+
+    /**
+     * @description Stores psychosocial assessment records. Patients can create their own, medical staff can create detailed ones.
+     * @path /registrosPsicosociales/{idRegistro}
+     * @allow (create) Patients can create their own records, doctors/admins can create for any patient.
+     * @allow (read) Doctors and admins can read all records. Patients can read their own.
+     * @principle Enables both self-reporting and professional assessment while maintaining privacy.
+     */
+    match /registrosPsicosociales/{idRegistro} {
+      allow get: if isOwnPaciente(resource.data.idPaciente) || isMedico() || isAdmin();
+      allow list: if isMedico() || isAdmin();
+      allow create: if (isOwnPaciente(request.resource.data.idPaciente)) || isMedico() || isAdmin();
+      allow update: if (isMedico() || isAdmin()) && isExistingDoc();
+      allow delete: if (isAdmin()) && isExistingDoc();
+    }
+
+    /**
+     * @description Read-only collection of employee data, likely from an external HR system.
+     * @path /empleadosEmp2024/{carnet}
+     * @allow (read) Any authenticated user can read this data.
+     * @deny (write) All write operations are blocked to maintain data integrity from the source system.
+     * @principle Enforces a one-way data flow for externally managed information.
+     */
+    match /empleadosEmp2024/{carnet} {
+      allow read: if isSignedIn();
+      allow write: if false; // This data is managed by an external API
+    }
+    
+    /**
+     * @description Stores audit and error logs. Writable by any signed-in user for their own actions. Readable only by ADMIN.
+     * @path /logs/{logId}
+     * @allow (create) Any authenticated user can create a log entry. The API should enforce that userId matches the authenticated user.
+     * @allow (read) Only ADMINs can read the logs for auditing purposes.
+     * @principle Centralizes and secures log creation and access.
+     */
+    match /logs/{logId} {
+        allow read: if isAdmin();
+        allow create: if isSignedIn();
+        allow write: if false;
+    }
+  }
+}

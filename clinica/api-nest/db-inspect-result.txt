@@ -1,0 +1,67 @@
+--- COLUMNS FOR Usuarios ---
+[
+  {
+    "name": "id_usuario",
+    "type": "int"
+  },
+  {
+    "name": "carnet",
+    "type": "varchar"
+  },
+  {
+    "name": "password_hash",
+    "type": "varchar"
+  },
+  {
+    "name": "nombre_completo",
+    "type": "varchar"
+  },
+  {
+    "name": "correo",
+    "type": "varchar"
+  },
+  {
+    "name": "id_rol",
+    "type": "int"
+  },
+  {
+    "name": "pais",
+    "type": "varchar"
+  },
+  {
+    "name": "estado",
+    "type": "char"
+  },
+  {
+    "name": "ultimo_acceso",
+    "type": "datetime2"
+  },
+  {
+    "name": "id_paciente",
+    "type": "int"
+  },
+  {
+    "name": "id_medico",
+    "type": "int"
+  },
+  {
+    "name": "fecha_creacion",
+    "type": "datetime2"
+  }
+]
+
+--- COLUMNS FOR Roles ---
+[
+  {
+    "name": "id_rol",
+    "type": "int"
+  },
+  {
+    "name": "nombre",
+    "type": "varchar"
+  },
+  {
+    "name": "descripcion",
+    "type": "varchar"
+  }
+]

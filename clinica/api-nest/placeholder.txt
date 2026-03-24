@@ -1,0 +1,13 @@
+Esta carpeta (api_server) ha sido creada como un marcador de posición.
+
+Aquí es donde se construiría la API de NestJS siguiendo las especificaciones del archivo `MegaPrompt_Backend.txt`.
+
+Un proyecto real de NestJS tendría una estructura de archivos y carpetas mucho más compleja, generada comúnmente con el NestJS CLI (`nest new api_server`).
+
+La estructura interna incluiría módulos para cada funcionalidad, como:
+- `src/auth/`
+- `src/admin/`
+- `src/medico/`
+- `src/paciente/`
+- `src/database/` (para la configuración de TypeORM)
+- etc.

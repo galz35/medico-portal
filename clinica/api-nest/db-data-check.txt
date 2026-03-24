@@ -1,0 +1,41 @@
+--- ROLES ---
+[
+  {
+    "id_rol": 1,
+    "nombre": "ADMIN",
+    "descripcion": "Administrador Global"
+  },
+  {
+    "id_rol": 2,
+    "nombre": "MEDICO",
+    "descripcion": "Personal Medico"
+  },
+  {
+    "id_rol": 3,
+    "nombre": "PACIENTE",
+    "descripcion": "Usuario Regular"
+  },
+  {
+    "id_rol": 4,
+    "nombre": "RRHH",
+    "descripcion": "Visualizacion de reportes"
+  }
+]
+
+--- USER GUSTAVO? ---
+[
+  {
+    "id_usuario": 6,
+    "carnet": "500708",
+    "password_hash": "PORTAL_LOGIN_ONLY",
+    "nombre_completo": "Gustavo Lira (Portal)",
+    "correo": "gustavo.lira@claro.com.ni",
+    "id_rol": 1,
+    "pais": "NI",
+    "estado": "A",
+    "ultimo_acceso": null,
+    "id_paciente": null,
+    "id_medico": null,
+    "fecha_creacion": "2026-03-16T09:39:55.220Z"
+  }
+]

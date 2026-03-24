@@ -1,0 +1,40 @@
+Esta carpeta (api_client) ha sido creada como un marcador de posición.
+
+Aquí es donde se implementaría el cliente que consume la API RESTful de NestJS.
+
+Actualmente, el frontend utiliza un servicio de datos de prueba (`src/lib/services/api.mock.ts`). 
+
+La migración implicaría crear un nuevo archivo, por ejemplo `src/lib/services/api.client.ts`, que contendría funciones que realizan llamadas `fetch` a los endpoints de la API real.
+
+Ejemplo de una función en `api.client.ts`:
+
+```typescript
+import { CasoClinico } from '@/lib/types/domain';
+
+const API_BASE_URL = 'http://localhost:3000'; // URL del backend de NestJS
+
+async function getAuthToken(): Promise<string> {
+    // Lógica para obtener el token JWT de localStorage o de donde se almacene
+    return localStorage.getItem('accessToken') || '';
+}
+
+export async function getCasosClinicos(filters: { estado?: string } = {}): Promise<CasoClinico[]> {
+    const token = await getAuthToken();
+    const response = await fetch(`${API_BASE_URL}/medico/agenda-citas`, {
+        headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+        }
+    });
+
+    if (!response.ok) {
+        throw new Error('No se pudieron obtener los casos clínicos');
+    }
+
+    return response.json();
+}
+
+// ...y así para todas las demás funciones de la API.
+```
+
+Luego, todos los componentes del frontend que actualmente importan desde `api.mock.ts` deberían ser actualizados para importar desde este nuevo `api.client.ts`.

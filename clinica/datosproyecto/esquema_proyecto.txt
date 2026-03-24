@@ -1,0 +1,62 @@
+# Esquema del Proyecto "Claro Mi Salud"
+
+## 1. Resumen del Proyecto
+Sistema de gestión de salud corporativo para conectar empleados (Pacientes) con el equipo médico (Médicos).
+- **Roles**: PACIENTE, MEDICO, ADMIN.
+- **Alcance**: Gestión de citas, casos clínicos, atenciones médicas, chequeos de bienestar, y registros psicosociales.
+- **Multipaís**: Soporte para NI, CR, HN.
+
+## 2. Arquitectura Actual (Frontend - `studio`)
+- **Framework**: Next.js (App Router).
+- **Estructura de Rutas (`src/app`)**:
+    - `(auth)`: Rutas de autenticación (Login).
+    - `(main)`: Rutas principales protegidas (Dashboard, Citas, etc.).
+- **Datos**: Simulados en memoria (`src/lib/mock`).
+- **Servicios**: `src/lib/services/api.mock.ts` simula llamadas a API con `delay`.
+- **Autenticación**: `AuthContext.tsx`.
+    - Persistencia: `localStorage`.
+    - Login: Busca en array `usuarios` por carnet.
+    - Roles: Soporta cambio de rol (`switchRole`).
+- **Integraciones Existentes**:
+    - **Firebase (`src/firebase`)**: Configuración de listeners y providers. Probablemente para auth anónimo o sincronización legacy.
+    - **AI (`src/ai`)**: Flujos de Genkit (ej. `analisis-triaje-medico`).
+
+## 3. Arquitectura Objetivo (Backend - `api_server`)
+- **Framework**: NestJS.
+- **Base de Datos**: PostgreSQL.
+- **ORM**: TypeORM.
+- **Autenticación**: JWT (JSON Web Tokens) + Bcrypt.
+- **Documentación**: Swagger.
+
+## 4. Modelos de Datos (Basado en `c.sql` y Mocks)
+
+### Entidades Principales
+- **Usuario (`usuarios`)**: Credenciales, Rol, País.
+- **Paciente (`pacientes`)**: Datos demográficos, empresa, nivel semáforo.
+- **Medico (`medicos`)**: Especialidad, tipo (Interno/Externo).
+
+### Entidades Clínicas
+- **CasoClinico (`casos_clinicos`)**: Agrupador de un problema de salud.
+    - Relaciones: Paciente, Cita Principal.
+- **CitaMedica (`citas_medicas`)**: Evento en calendario.
+    - Relaciones: Paciente, Medico, Caso.
+- **AtencionMedica (`atenciones_medicas`)**: Detalle clínico de una cita.
+    - Relaciones: Cita, Medico.
+- **ChequeoBienestar (`chequeos_bienestar`)**: Auto-reporte del paciente (JSONB).
+- **RegistroPsicosocial (`registros_psicosociales`)**: Evaluación mental/emocional.
+
+## 5. Archivos Clave Analizados
+- **Base de Datos**: `c.sql` (Schema PostgreSQL).
+- **Mocks**: `src/lib/mock/*.ts` (Datos de prueba).
+- **Lógica Mock**: `src/lib/services/api.mock.ts` (Simulación de lógica de negocio).
+- **Auth**: `src/lib/context/AuthContext.tsx` (Estado global de usuario).
+- **Reglas**: `firestore.rules` (Referencia de reglas de seguridad anteriores).
+- **Componentes**: `src/components` (UI compartida y específica por rol).
+
+## 6. Notas de Migración
+- **AuthContext**: Debe reescribirse para usar `fetch` al endpoint `/auth/login` y guardar JWT.
+- **API Client**: Reemplazar `api.mock.ts` con un cliente real (`api.client.ts`) que use `fetch` y maneje headers de autorización.
+- **Firebase**: Evaluar si se elimina completamente o se mantiene para alguna funcionalidad específica (ej. notificaciones).
+- **AI**: Mover la lógica de `src/ai` (Genkit) al backend o exponerla vía API si se ejecuta en un servicio separado.
+- **Relaciones**: En el mock, las relaciones se resuelven manualmente (filtros de arrays). En el backend, TypeORM manejará esto (JOINs).
+- **Lógica de Negocio**: Mover validaciones y creación de registros dependientes (ej. crear Caso al crear Cita) del frontend al backend (Transacciones).

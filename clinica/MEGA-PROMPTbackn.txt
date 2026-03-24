@@ -1,0 +1,262 @@
+# Mega Prompt para Backend de "Claro Mi Salud" v2.1 (NestJS, TypeORM, PostgreSQL)
+
+## 1. Resumen del Proyecto y Visión Técnica
+
+**"Claro Mi Salud"** es un sistema de gestión de salud corporativo diseñado para conectar a los empleados (Pacientes) con el equipo médico de la empresa (Médicos), todo gestionado por un rol de Administrador. La aplicación facilita el seguimiento del bienestar, la gestión de citas, la atención clínica digital y la administración general del sistema.
+
+Este documento es una especificación técnica exhaustiva para construir un backend robusto, seguro y escalable utilizando **NestJS**, **TypeORM** y **PostgreSQL**. El objetivo es crear una API RESTful que sirva como la única fuente de verdad para la aplicación frontend.
+
+### Principios de Diseño del Backend:
+- **Seguridad primero:** La API debe estar asegurada con JWT para autenticación y una estrategia de autorización basada en roles (RBAC) para controlar el acceso a los recursos.
+- **Filtrado por País:** Todas las consultas que devuelven listas de datos (usuarios, casos, médicos, etc.) deben ser filtradas implícitamente por el `pais` del usuario autenticado (extraído del token JWT). Un administrador de Nicaragua solo debe ver datos de Nicaragua.
+- **Integridad de Datos:** Utilizar transacciones de base de datos para operaciones complejas que involucran múltiples tablas (ej. guardar una atención médica, que actualiza la cita, el caso y crea registros de seguimiento).
+- **Documentación Clara:** La API debe estar documentada utilizando Swagger (OpenAPI) para facilitar el consumo por parte del equipo de frontend y para futuras integraciones.
+- **Validación Rigurosa:** Utilizar DTOs (Data Transfer Objects) con `class-validator` y `class-transformer` para validar todos los datos de entrada y evitar la inserción de datos corruptos.
+
+---
+
+## 2. Arquitectura y Stack Tecnológico
+
+- **Framework:** NestJS
+- **ORM (Object-Relational Mapping):** TypeORM
+- **Base de Datos:** PostgreSQL
+- **Autenticación:** JWT (JSON Web Tokens). Las contraseñas deben ser hasheadas con `bcrypt`.
+- **Documentación API:** Swagger (integrado en NestJS).
+- **Lenguaje:** TypeScript.
+- **Validación de Datos:** `class-validator` y `class-transformer` para DTOs.
+- **Estructura del Proyecto (Sugerida):**
+  ```
+  /src
+  |-- /auth (Módulo de autenticación)
+  |-- /admin (Módulo para endpoints de admin)
+  |-- /medico (Módulo para endpoints de médico)
+  |-- /paciente (Módulo para endpoints de paciente)
+  |-- /database (Configuración de TypeORM)
+  |-- /common (Guards, DTOs compartidos, etc.)
+  |-- app.module.ts
+  |-- main.ts
+  ```
+
+---
+
+## 3. Modelo de Datos Detallado (Entidades TypeORM para PostgreSQL)
+
+A continuación, se describen las entidades, sus campos, los tipos de datos de PostgreSQL, las relaciones y la lógica de negocio asociada.
+
+### `Usuario` (tabla: `usuarios`)
+Almacena las credenciales y datos básicos de acceso. Es la tabla central para la autenticación.
+
+```typescript
+// src/entities/usuario.entity.ts
+import { Entity, PrimaryGeneratedColumn, Column, OneToOne, JoinColumn } from 'typeorm';
+import { Paciente } from './paciente.entity';
+import { Medico } from './medico.entity';
+
+@Entity('usuarios')
+export class Usuario {
+  @PrimaryGeneratedColumn()
+  id_usuario: number;
+
+  @Column({ type: 'varchar', length: 50, unique: true, comment: 'Carnet del empleado o identificador único.' })
+  carnet: string;
+
+  @Column({ type: 'varchar', comment: 'Hash de la contraseña generado con bcrypt.' })
+  password_hash: string;
+
+  @Column({ type: 'varchar', length: 255 })
+  nombre_completo: string;
+
+  @Column({ type: 'varchar', length: 100, nullable: true })
+  correo: string;
+
+  @Column({ type: 'varchar', length: 20, comment: 'Roles: PACIENTE, MEDICO, ADMIN' })
+  rol: string;
+
+  @Column({ type: 'varchar', length: 2, comment: 'País del usuario: NI, CR, HN' })
+  pais: string;
+
+  @Column({ type: 'char', length: 1, default: 'A', comment: 'Estado: A (Activo), I (Inactivo)' })
+  estado: string;
+
+  @Column({ type: 'timestamptz', nullable: true, comment: 'Fecha y hora del último inicio de sesión.' })
+  ultimo_acceso: Date;
+
+  // Relaciones
+  @OneToOne(() => Paciente, paciente => paciente.usuario, { nullable: true, cascade: true })
+  @JoinColumn({ name: 'id_paciente' })
+  paciente: Paciente;
+
+  @OneToOne(() => Medico, medico => medico.usuario, { nullable: true, cascade: true })
+  @JoinColumn({ name: 'id_medico' })
+  medico: Medico;
+}
+```
+
+### `Paciente` (tabla: `pacientes`)
+Datos demográficos y de la empresa del paciente.
+
+```typescript
+// src/entities/paciente.entity.ts
+@Entity('pacientes')
+export class Paciente {
+  @PrimaryGeneratedColumn()
+  id_paciente: number;
+
+  @Column({ type: 'varchar', length: 50, unique: true })
+  carnet: string;
+  
+  @Column({ type: 'varchar', length: 255 })
+  nombre_completo: string;
+
+  @Column({ type: 'date', nullable: true })
+  fecha_nacimiento: Date;
+  
+  @Column({ type: 'varchar', length: 50, nullable: true })
+  sexo: string;
+
+  @Column({ type: 'varchar', length: 20, nullable: true })
+  telefono: string;
+
+  @Column({ type: 'varchar', length: 100, nullable: true })
+  correo: string;
+
+  @Column({ type: 'varchar', length: 100, nullable: true })
+  gerencia: string;
+
+  @Column({ type: 'varchar', length: 100, nullable: true })
+  area: string;
+
+  @Column({ type: 'char', length: 1, default: 'A' })
+  estado_paciente: string; // A: Activo, I: Inactivo
+
+  @Column({ type: 'char', length: 1, nullable: true, comment: 'Nivel de semáforo: V, A, R' })
+  nivel_semaforo: string;
+
+  // Relaciones
+  @OneToOne(() => Usuario, usuario => usuario.paciente)
+  usuario: Usuario;
+
+  @OneToMany(() => CasoClinico, caso => caso.paciente)
+  casos_clinicos: CasoClinico[];
+}
+```
+
+(Continúa con las definiciones para `Medico`, `CasoClinico`, `CitaMedica`, `AtencionMedica`, `ChequeoBienestar`, `ExamenMedico`, `SeguimientoPaciente` y el nuevo `RegistroPsicosocial`, siguiendo el mismo formato detallado).
+
+### `RegistroPsicosocial` (tabla: `registros_psicosociales`)
+Nueva tabla para almacenar las evaluaciones psicosociales.
+
+```typescript
+// src/entities/registro_psicosocial.entity.ts
+@Entity('registros_psicosociales')
+export class RegistroPsicosocial {
+  @PrimaryGeneratedColumn()
+  id_registro: number;
+
+  @ManyToOne(() => Paciente)
+  @JoinColumn({ name: 'id_paciente' })
+  paciente: Paciente;
+
+  @ManyToOne(() => Medico)
+  @JoinColumn({ name: 'id_medico' })
+  medico: Medico;
+
+  @Column({ type: 'timestamptz', default: () => 'CURRENT_TIMESTAMP' })
+  fecha_registro: Date;
+  
+  @Column({ type: 'varchar', length: 20, nullable: true })
+  nivel_estres: string; // Bajo, Medio, Alto
+
+  @Column({ type: 'jsonb', nullable: true, comment: 'Almacena un array de síntomas como ["Ansiedad", "Insomnio"]' })
+  sintomas_referidos: object;
+
+  @Column({ type: 'text', nullable: true, comment: 'Narrativa del paciente sobre su estado de ánimo.' })
+  narrativa_paciente: string;
+  
+  @Column({ type: 'varchar', length: 20, nullable: true, comment: 'Resultado del análisis de sentimiento por IA: Positivo, Negativo, Neutro' })
+  analisis_sentimiento_ia: string;
+
+  @Column({ type: 'boolean', default: false, comment: 'Bandera de alerta para riesgo suicida.' })
+  riesgo_suicida: boolean;
+
+  @Column({ type: 'boolean', default: false, comment: 'Recomendación de derivar a psicología.' })
+  derivar_a_psicologia: boolean;
+
+  @Column({ type: 'text', nullable: true, comment: 'Notas confidenciales del profesional de la salud.' })
+  notas_profesional: string;
+}
+```
+
+---
+
+## 4. Endpoints de la API (Flujos de Negocio Detallados)
+
+A continuación, se detalla la lógica para cada endpoint, incluyendo los DTOs y las interacciones con la base de datos.
+
+### Módulo de Autenticación (`/auth`)
+
+#### `POST /auth/login`
+- **Rol:** Público.
+- **DTO:** `LoginUsuarioDto { carnet: string, password: string }`.
+- **Lógica:**
+    1.  Buscar en la tabla `usuarios` un registro donde `carnet` coincida. Si no se encuentra o el `estado` es 'I', devolver `401 Unauthorized`.
+    2.  Usar `bcrypt.compare()` para verificar el `password` proporcionado contra el `password_hash` almacenado. Si no coincide, devolver `401 Unauthorized`.
+    3.  Si las credenciales son válidas, generar un token JWT.
+    4.  **Payload del JWT:** `{ sub: id_usuario, carnet: string, rol: string, pais: string, idPaciente: number | null, idMedico: number | null }`. El `sub` (subject) debe ser el `id_usuario`.
+    5.  En una operación asíncrona (sin bloquear la respuesta), actualizar el campo `ultimo_acceso` del usuario a la fecha y hora actuales.
+- **Respuesta Exitosa:** `{ accessToken: string }`.
+
+### Módulo de Administrador (`/admin`)
+- **Guardia de Rol:** Todos los endpoints aquí deben estar protegidos por un `RolesGuard` que verifique que el rol del JWT sea `ADMIN`.
+- **Guardia de País:** Todas las consultas deben filtrar por el `pais` del token JWT.
+
+#### `GET /admin/dashboard`
+- **Lógica:** Devuelve un objeto con KPIs agregados para el país del administrador.
+- **Consultas SQL (Ejemplos):**
+  - `SELECT COUNT(*) FROM usuarios WHERE pais = $1 AND estado = 'A';`
+  - `SELECT COUNT(*) FROM medicos m JOIN usuarios u ON u.id_medico = m.id_medico WHERE u.pais = $1 AND m.estado_medico = 'A';`
+  - `SELECT COUNT(*) FROM citas_medicas c JOIN pacientes p ON c.id_paciente = p.id_paciente WHERE p.pais = $1 AND c.fecha_cita = CURRENT_DATE;`
+  - `SELECT COUNT(*) FROM pacientes WHERE pais = $1 AND nivel_semaforo = 'R';`
+- **Respuesta:** `{ totalUsuarios: number, medicosActivos: number, citasHoy: number, pacientesEnRojo: number, ... }`.
+
+#### `POST /admin/usuarios`
+- **DTO:** `CrearUsuarioDto { carnet: string, nombreCompleto: string, correo: string, rol: 'PACIENTE'|'MEDICO'|'ADMIN', pais: 'NI'|'CR'|'HN', password, ... }`.
+- **Lógica (Transaccional):**
+    1.  Verificar que el `carnet` no exista ya en la tabla `usuarios`.
+    2.  Hashear el `password` con `bcrypt`.
+    3.  Crear una nueva entidad `Usuario`.
+    4.  **Si el `rol` es `PACIENTE`:**
+        a. Crear una nueva entidad `Paciente` con los datos del usuario.
+        b. Asociar el nuevo paciente al usuario (`usuario.paciente = nuevoPaciente`).
+    5.  **Si el `rol` es `MEDICO`:**
+        a. Crear una nueva entidad `Medico`.
+        b. Asociar el nuevo médico al usuario (`usuario.medico = nuevoMedico`).
+    6.  Guardar el `Usuario` (y la entidad relacionada en cascada) dentro de una transacción.
+- **Respuesta:** `201 Created` con el objeto `Usuario` recién creado (sin el hash de la contraseña).
+
+#### `PUT /admin/usuarios/:id`
+- **DTO:** `ActualizarUsuarioDto { rol?: Rol, estado?: 'A' | 'I' }`.
+- **Lógica:** Actualiza campos específicos de un `Usuario`. No debe permitir cambiar datos sensibles que deben gestionarse en otros módulos (como el nombre, que viene de la entidad `Empleado`).
+
+... (y así sucesivamente para cada endpoint definido en el frontend, detallando la lógica, DTOs y consultas SQL/TypeORM necesarias).
+
+### Módulo de Paciente (`/paciente`)
+- **Guardia de Rol:** Protegido por `RolesGuard` para `PACIENTE`.
+- **Lógica de Pertenencia:** El `id_paciente` para las consultas debe ser extraído del `idPaciente` del token JWT, no de los parámetros de la URL, para asegurar que un paciente solo vea sus propios datos.
+
+#### `POST /paciente/solicitar-cita`
+- **DTO:** `SolicitudCitaDto { ... }` (debe coincidir con la estructura del payload del wizard).
+- **Lógica (Transaccional):**
+    1.  Crear un registro en `ChequeoBienestar` con todos los `datos_completos` en el campo JSONB.
+    2.  **Si la `ruta` de la solicitud es `'consulta'` (el paciente tiene una molestia):**
+        a. Crear un nuevo `CasoClinico`.
+        b. El `motivo_consulta` se genera concatenando los síntomas principales.
+        c. El `nivel_semaforo` se calcula basado en la criticidad de los síntomas reportados.
+        d. Guardar el `CasoClinico`.
+    3.  **Llamada a IA (asíncrona):** Después de crear el caso, disparar una llamada al flujo de `analisisTriajeMedico` de Genkit. El resultado de este análisis (`TriajeIA`) se debe actualizar en el registro del `CasoClinico` recién creado. Esto no debe bloquear la respuesta al usuario.
+- **Respuesta:** `201 Created`.
+
+... (continuar con el resto de los módulos).
+---
+
+Este documento ahora sirve como una guía técnica exhaustiva para el desarrollo del backend. Cada desarrollador puede tomar un módulo y entender exactamente qué se espera, cómo se relaciona con otras partes del sistema y qué lógica de negocio debe aplicar.

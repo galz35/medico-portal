@@ -1,0 +1,76 @@
+# Plan de Migración Teórica: De Firebase/Mock a una API RESTful (NestJS)
+
+Este documento detalla los cambios teóricos necesarios para migrar la aplicación frontend actual, que funciona con una combinación de Firebase Auth y un servicio de datos de prueba (mock), a una arquitectura que consume una API RESTful construida con NestJS.
+
+## 1. El Estado Actual: Arquitectura Híbrida
+
+Actualmente, la aplicación opera de la siguiente manera:
+- **Autenticación:** Utiliza Firebase Authentication (específicamente `signInAnonymously` o un login simulado) para gestionar la sesión del usuario. El estado del usuario (`User` de Firebase) se obtiene a través del hook `useUser()`.
+- **Datos de la Aplicación:** Toda la lógica de negocio (obtener pacientes, crear casos, agendar citas) se simula a través de un servicio de mock (`src/lib/services/api.mock.ts`). Este servicio lee y escribe en arrays de datos en memoria, no hay persistencia real más allá de la sesión del navegador.
+- **Autorización:** Se basa en una combinación de las propiedades del objeto de usuario de Firebase y los datos de perfil del mock.
+
+Esta arquitectura es ideal para prototipado rápido del frontend, pero no es escalable ni persistente.
+
+## 2. El Estado Futuro: Arquitectura Cliente-Servidor con API
+
+La arquitectura final consistirá en:
+- **Frontend (Next.js):** Se convierte en un cliente "puro". Su única responsabilidad es presentar la UI y realizar llamadas HTTP (fetch) a la API para todas las operaciones de datos.
+- **Backend (NestJS API):** Es la única fuente de verdad. Contiene toda la lógica de negocio, se conecta a la base de datos PostgreSQL y gestiona la autenticación y autorización.
+
+## 3. Cambios Críticos por Módulo
+
+### 3.1. Autenticación (`AuthContext` y Flujo de Login)
+
+**Como es ahora:**
+- El `AuthContext` simula un login buscando un carnet en `usuarios.mock.ts`.
+- Guarda el perfil del usuario de prueba en `localStorage`.
+- No hay un token de sesión real, solo un objeto en el estado de React.
+
+**Cómo cambiaría:**
+1.  **Endpoint de Login en la API:** El backend expondrá un endpoint `POST /auth/login`.
+2.  **Llamada Fetch:** La función `login` en `AuthContext` ya no buscará en un mock. En su lugar, hará una llamada `fetch` a `POST /auth/login` con el `carnet` y `password`.
+3.  **Gestión de Token JWT:**
+    - Si el login es exitoso, la API devolverá un `accessToken` (JWT).
+    - Este token se almacenará de forma segura en el cliente (ej. `localStorage` o una cookie `httpOnly`).
+    - El `AuthContext` guardará el *payload decodificado* del token en su estado (`usuarioActual`), que contiene el rol, país, etc.
+4.  **Autenticación de Solicitudes:** Todas las llamadas `fetch` subsecuentes a la API deberán incluir el `accessToken` en la cabecera `Authorization` (ej. `Authorization: Bearer <token>`).
+5.  **Logout:** La función `logout` simplemente eliminará el token del almacenamiento local y limpiará el estado del `AuthContext`.
+
+### 3.2. Obtención y Modificación de Datos (Reemplazo del Mock)
+
+**Como es ahora:**
+- Todas las páginas y componentes importan funciones desde `src/lib/services/api.mock.ts` (ej. `api.getCasosClinicos()`).
+- Estas funciones devuelven datos de arrays en memoria, a menudo con un `delay` simulado.
+
+**Cómo cambiaría:**
+1.  **Creación de un Cliente de API:** Se crearía un nuevo servicio, por ejemplo `src/lib/services/api.client.ts`.
+2.  **Implementación con `fetch`:** Cada función en este nuevo cliente corresponderá a un endpoint de la API.
+    - `api.getCasosClinicos()` se convertirá en `fetch('/api/medico/agenda-citas', { headers: { Authorization: ... } })`.
+    - `api.crearCasoClinico(data)` se convertirá en `fetch('/api/paciente/solicitar-cita', { method: 'POST', body: JSON.stringify(data), ... })`.
+3.  **Refactorización de Componentes:** Todos los componentes que actualmente usan `api.mock.ts` deberán ser actualizados para importar y usar las funciones del nuevo `api.client.ts`. Dado que las llamadas `fetch` son asíncronas, la gestión del estado de carga (`isLoading`) y errores (`error`) en los componentes se vuelve aún más crucial.
+
+### 3.3. Autorización y Acceso a Datos
+
+**Como es ahora:**
+- El filtrado de datos por país o rol se simula dentro de las funciones del `api.mock.ts`. El frontend confía en que el mock le devuelve solo los datos que le corresponden.
+
+**Cómo cambiaría:**
+1.  **La Responsabilidad se Mueve al Backend:** La seguridad ya no reside en el cliente. El backend se encargará de toda la autorización.
+2.  **Guards de Rol en NestJS:** El backend utilizará `Guards` para proteger cada endpoint. Un `RolesGuard` verificará el `rol` dentro del payload del JWT antes de permitir el acceso a un controlador (ej. `@Roles('ADMIN')`).
+3.  **Filtrado de Datos en el Servidor:** La lógica de negocio en los servicios de NestJS extraerá el `pais` del JWT y lo añadirá como una cláusula `WHERE` en todas las consultas de TypeORM/SQL.
+    - Ejemplo: `this.casosRepository.find({ where: { paciente: { pais: user.pais } } })`.
+4.  **Lógica de Pertenencia:** Para endpoints donde un usuario solo puede ver sus propios datos (ej. un paciente viendo "Mis Citas"), el backend usará el `id_paciente` del JWT para filtrar la consulta, en lugar de confiar en un ID pasado por la URL.
+
+### 4. Resumen del Cambio de Paradigma
+
+| Característica | Arquitectura Actual (Mock) | Arquitectura Futura (API) |
+| :--- | :--- | :--- |
+| **Fuente de Verdad** | Arrays en memoria (`/lib/mock`) | Base de datos PostgreSQL |
+| **Persistencia** | Ninguna (se pierde al recargar) | Persistente y transaccional |
+| **Autenticación** | Simulada con `localStorage` | Real, basada en JWT |
+| **Autorización** | Simulada en el cliente | Forzada en el backend (Guards) |
+| **Lógica de Negocio** | Mezclada en el mock y componentes | Centralizada en los servicios de NestJS |
+| **Llamadas de Datos** | `import { funcion } from 'api.mock.ts'` | `fetch('/api/endpoint')` |
+| **Seguridad** | Inexistente (confianza total en el cliente) | Robusta, centralizada en el servidor |
+
+La migración implicaría un trabajo de refactorización significativo en el frontend, principalmente reemplazando el servicio de mock por un cliente de API real y ajustando el `AuthContext`. Sin embargo, la estructura actual de componentes y la lógica de la UI se mantendrían en gran medida intactas, ya que la "forma" de los datos que consumen no cambiaría drásticamente gracias a una API bien diseñada.

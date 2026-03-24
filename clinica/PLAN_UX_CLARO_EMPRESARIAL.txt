@@ -1,0 +1,88 @@
+================================================================================
+PLAN ESTRATÉGICO Y DE UI/UX: CLARO MI SALUD EMPRESARIAL
+================================================================================
+
+1. VISIÓN DEL PRODUCTO
+--------------------------------------------------------------------------------
+La plataforma "Claro Mi Salud" debe ser la herramienta clínica interna definitiva 
+para los empleados y cuerpo médico de Claro. 
+
+Directrices Fundamentales:
+A) Cero Fricción (Diseño Guiado): El usuario nunca debe pensar "qué hago ahora". 
+   Cada proceso (agendar cita, ver resultados, triaje) debe ser un "Wizard" 
+   paso a paso, llevándolo de la mano de forma intuitiva.
+B) Adaptabilidad Total (Responsive Design): El diseño web debe verse igual de bien 
+   en el smartphone de un técnico en campo que en el monitor del gerente médico.
+C) Rendimiento Extremo: Tiempos de carga casi nulos gracias a la arquitectura 
+   Fastify JSON en backend y cargas perezosas (Lazy Loading) en Front.
+D) Identidad Corporativa: Minimalismo clínico mezclado con la identidad Claro. 
+   Mucho espacio en blanco, tipografía legible y detalles en Rojo Claro (#DA291C).
+
+================================================================================
+2. PARADIGMAS DE DISEÑO (UI / UX) "LLEVAR DE LA MANO"
+--------------------------------------------------------------------------------
+- Asistentes Paso a Paso (Wizards): En lugar de formularios gigantes, dividimos 
+  acciones complejas (Ej. Agendar Cita) en pantallas simples:
+    Paso 1: ¿Qué te duele? (Lista visual de opciones)
+    Paso 2: Elije a tu médico. (Tarjetas de perfil)
+    Paso 3: Selecciona la hora. (Calendario interactivo estilo Apple/Google)
+    Paso 4: ¡Listo! (Pantalla de éxito gigante)
+
+- Micro-interacciones: Animaciones suaves al presionar botones o al cargar datos.
+  Si algo toma más de 500ms, se muestra un esqueleto de carga (Skeleton Loader) 
+  para mantener al usuario tranquilo.
+
+- Jerarquía Visual: Lo más importante siempre va grande y arriba. Ej: 
+  "¡Tienes una cita hoy a las 10:00 AM!" con un fondo rojo para captar atención.
+
+- Adaptabilidad (Mobile First y Desktop Ready):
+    * Celular (App Flutter y Web Móvil): Botones grandes en la parte INFERIOR 
+      para usar con una sola mano (Bottom Navigation, FABs accesibles).
+    * Escritorio (Next.js): Menús laterales expandidos, tablas densas de datos 
+      donde el ratón domina.
+
+================================================================================
+3. PLAN DE TRABAJO TÉCNICO Y PASO A PASO
+--------------------------------------------------------------------------------
+
+FASE 1: Cimientos Visuales Web (Responsivo y Tema Claro)
+[ ] 1. Configurar `tailwind.config.ts` para integrar los colores oficiales:
+       - claro-red: #DA291C (Botones CTA, Alertas, Iconos Activos)
+       - claro-bg: #F9FAFB (Gris ultra claro para fondo de paneles)
+[ ] 2. Ajustar `globals.css` (Next.js) para incluir fuentes legibles recomendadas 
+       (Ej. Inter o Roboto), mejorar el suavizado de fuentes.
+[ ] 3. Implementar un `Layout` global que cambie inteligentemente:
+       Sidebar en Desktop, Bottom Navigation temporal en Tablets/Móviles.
+
+FASE 2: Destrucción de Firebase y Enlace a Fastify JSON
+[ ] 1. Arrancar de raíz toda dependencia a Firebase en `package.json` y `src/(main)`.
+[ ] 2. Migrar los clientes de `api.ts` para que lean directamente del puerto 3000 
+       (El nuevo Fastify).
+[ ] 3. Eliminar todos los mocks de datos (datos falsos). Remplazar `Gestión Médicos` 
+       y `Gestión Usuarios` con las verdaderas listas que entrega el SQL Server.
+
+FASE 3: Flujos Guiados (Wizards) en Next.js
+[ ] 1. Construir componente genérico `Stepper` o `Wizard` para Reusar.
+[ ] 2. Refactorizar el módulo "Solicitar Cita" para usar este Wizard.
+
+FASE 4: App Flutter - Ultra Rendimiento y UX Nativo
+[ ] 1. Asegurar `Dio` interceptor con manejo de estado centralizado (Provider u otro) 
+       para caché de datos.
+[ ] 2. Material 3 a tope: Inyectar el Color #DA291C en `ThemeData`.
+[ ] 3. Programar el Layout principal móvil:
+       - BottomNavigationBar estándar, curva de aprendizaje cero.
+       - Tarjetas en carrusel tipo historias de IG para anuncios del departamento de salud.
+
+FASE 5: Seguridad y Pulido Final
+[ ] 1. Bloquear accesos a rutas web según ROLES (Validación contra JWT no solo front, 
+       sino también a nivel de Server Components).
+[ ] 2. Auditoría de rendimiento web nativo (Lighthouse - aspirar a 95+ de Performance).
+[ ] 3. Remover el endpoint de "debug de contraseñas" directo en NestJS para evitar 
+       fugas críticas en el ecosistema Claro.
+
+================================================================================
+RESUMEN DE ARQUITECTURA (Para IT Claro):
+1. SQL Server > Stored Procedures rápidos (Evita ORM lento)
+2. NestJS > Fastify JSON Ligero + gRPC (Microservicios rápidos)
+3. Next.js 15 Tailwind / Flutter > Clientes optimizados, responsivos y amigables.
+================================================================================
