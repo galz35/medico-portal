@@ -97,7 +97,6 @@ export class AuthService {
                 const portalUser = response.data.identity;
                 
                 const carnetStr = String(portalUser.carnet || '').trim();
-                
                 // Buscar el usuario en la BD de Clinica por carnet
                 const rows = await this.db.query<any>(
                     `SELECT u.*, r.nombre as rol 
@@ -108,34 +107,52 @@ export class AuthService {
                 );
                 let user = rows.length > 0 ? rows[0] : null;
 
+                const upsertParams = {
+                    Carnet: carnetStr,
+                    Nombre: portalUser.nombre || portalUser.usuario,
+                    Correo: portalUser.correo || '',
+                    Pais: portalUser.esInterno ? 'NI' : 'OT',
+                    Estado: 'A'
+                };
+
                 if (!user) {
                     try {
                         this.logger.log(`[PortalSSO] Provisionando JIT: ${carnetStr}`);
                         await this.db.query(
                             `INSERT INTO Usuarios (carnet, password_hash, nombre_completo, correo, id_rol, pais, estado, fecha_creacion) 
-                             VALUES (@Carnet, 'PORTAL_SSO', @Nombre, @Correo, 3, @Pais, 'A', GETDATE())`,
-                            {
-                                Carnet: carnetStr,
-                                Nombre: portalUser.nombre || portalUser.usuario,
-                                Correo: portalUser.correo || '',
-                                Pais: portalUser.esInterno ? 'NI' : 'OT'
-                            }
+                             VALUES (@Carnet, 'PORTAL_SSO', @Nombre, @Correo, 3, @Pais, @Estado, GETDATE())`,
+                            upsertParams
                         );
-                        
-                        const retryRows = await this.db.query<any>(
-                            `SELECT u.*, r.nombre as rol 
-                             FROM Usuarios u 
-                             JOIN Roles r ON u.id_rol = r.id_rol 
-                             WHERE u.carnet = @Carnet`, 
-                            { Carnet: carnetStr }
-                        );
-                        return retryRows.length > 0 ? retryRows[0] : null;
                     } catch (dbErr) {
                         this.logger.error('[PortalSSO] Error JIT:', dbErr.message);
                         return null;
                     }
+                } else {
+                    // Update user fields
+                    try {
+                        await this.db.query(
+                            `UPDATE Usuarios SET 
+                             nombre_completo = @Nombre, 
+                             correo = @Correo, 
+                             estado = @Estado, 
+                             pais = @Pais 
+                             WHERE carnet = @Carnet`,
+                            upsertParams
+                        );
+                    } catch (dbErr) {
+                        this.logger.error('[PortalSSO] Error Actualizando JIT:', dbErr.message);
+                    }
                 }
-                return user;
+
+                // Return updated/created user
+                const retryRows = await this.db.query<any>(
+                    `SELECT u.*, r.nombre as rol 
+                     FROM Usuarios u 
+                     JOIN Roles r ON u.id_rol = r.id_rol 
+                     WHERE u.carnet = @Carnet`, 
+                    { Carnet: carnetStr }
+                );
+                return retryRows.length > 0 ? retryRows[0] : null;
             }
         } catch (err) {
             this.logger.warn('[PortalSSO] Error introspect:', err.message);
@@ -196,37 +213,90 @@ export class AuthService {
             const rows = await this.db.query<any>(queryUser, { Carnet: carnetStr });
             let user = rows.length > 0 ? rows[0] : null;
 
+            const upsertParams = {
+                Carnet: carnetStr,
+                Nombre: payload.name || payload.username || 'Usuario Portal',
+                Correo: payload.correo || `${carnetStr}@claro.com.ni`,
+                Pais: 'NI',
+                Estado: 'A'
+            };
+
             if (!user) {
                 console.log(`[SSO-DEBUG] Usuario NO encontrado en BD Clinica. Iniciando auto-registro (JIT)...`);
                 this.logger.log(`[SSO] Usuario no encontrado, iniciando JIT para carnet: ${carnetStr}`);
                 try {
                     await this.db.query(
                         `INSERT INTO Usuarios (carnet, password_hash, nombre_completo, correo, id_rol, pais, estado, fecha_creacion) 
-                         VALUES (@Carnet, 'PORTAL_SSO', @Nombre, @Correo, 3, @Pais, 'A', GETDATE())`,
-                        {
-                            Carnet: carnetStr,
-                            Nombre: payload.name || payload.username || 'Usuario Portal',
-                            Correo: payload.correo || `${carnetStr}@claro.com.ni`,
-                            Pais: 'NI'
-                        }
+                         VALUES (@Carnet, 'PORTAL_SSO', @Nombre, @Correo, 3, @Pais, @Estado, GETDATE())`,
+                        upsertParams
                     );
-                    
-                    console.log(`[SSO-DEBUG] Registro JIT exitoso para: ${carnetStr}. Re-consultando...`);
-                    const retryRows = await this.db.query<any>(queryUser, { Carnet: carnetStr });
-                    user = retryRows.length > 0 ? retryRows[0] : null;
+                    console.log(`[SSO-DEBUG] Registro JIT exitoso para: ${carnetStr}.`);
                 } catch (dbErr) {
                     console.error(`[SSO-DEBUG] ERROR CRITICO en INSERT JIT:`, dbErr);
                     this.logger.error(`[SSO] Error crítico JIT DB para ${carnetStr}: ${dbErr.message}`);
                     return null;
                 }
+            } else {
+                 try {
+                    await this.db.query(
+                        `UPDATE Usuarios SET 
+                         nombre_completo = @Nombre, 
+                         correo = @Correo, 
+                         estado = @Estado, 
+                         pais = @Pais 
+                         WHERE carnet = @Carnet`,
+                        upsertParams
+                    );
+                 } catch (dbErr) {
+                    console.error(`[SSO-DEBUG] ERROR CRITICO en UPDATE JIT:`, dbErr);
+                 }
             }
+
+            const retryRows = await this.db.query<any>(queryUser, { Carnet: carnetStr });
+            user = retryRows.length > 0 ? retryRows[0] : null;
 
             console.log(`[SSO-DEBUG] Usuario listo para Login: ${user?.carnet} (ID: ${user?.id_usuario})`);
             return user;
+        }
+    }
+
+    async syncUserFromPortal(data: any): Promise<boolean> {
+        try {
+            console.log(`[SSO-SYNC] Forzando actualización en Clinica para usuario: ${data.carnet}`);
+            
+            const carnetStr = String(data.carnet).trim();
+            const rows = await this.db.query<any>(`SELECT id_usuario FROM Usuarios WHERE carnet = @Carnet`, { Carnet: carnetStr });
+            const userExists = rows.length > 0;
+            
+            const upsertParams = {
+                Carnet: carnetStr,
+                Nombre: data.nombre,
+                Correo: data.correo || '',
+                Pais: data.esInterno === false ? 'OT' : 'NI',
+                Estado: data.activo ? 'A' : 'I' // Inactivo
+            };
+
+            if (userExists) {
+                await this.db.query(
+                    `UPDATE Usuarios SET 
+                     nombre_completo = @Nombre, 
+                     correo = @Correo, 
+                     estado = @Estado, 
+                     pais = @Pais 
+                     WHERE carnet = @Carnet`,
+                    upsertParams
+                );
+            } else {
+                await this.db.query(
+                    `INSERT INTO Usuarios (carnet, password_hash, nombre_completo, correo, id_rol, pais, estado, fecha_creacion) 
+                     VALUES (@Carnet, 'PORTAL_SSO', @Nombre, @Correo, 3, @Pais, @Estado, GETDATE())`,
+                    upsertParams
+                );
+            }
+            return true;
         } catch (e) {
-            console.error(`[SSO-DEBUG] FALLO TOTAL EN VALIDACION SSO:`, e);
-            this.logger.error(`[SSO] Error CRÍTICO validación ticket: ${e.message}`, e.stack);
-            return null;
+            console.error(`[SSO-SYNC] Error sincronizando en Clinica:`, e.message);
+            return false;
         }
     }
 }

@@ -73,4 +73,13 @@ export class AuthController {
             throw new UnauthorizedException('Error interno en autenticación SSO');
         }
     }
+
+    @Post('sso-sync-user')
+    @HttpCode(HttpStatus.OK)
+    @ApiOperation({ summary: 'Sincronizar webhook desde Portal Central' })
+    async ssoSyncUser(@Body() data: any) {
+        if (!data.carnet) throw new UnauthorizedException('Carnet requerido para sincronizar');
+        const result = await this.authService.syncUserFromPortal(data);
+        return { success: result };
+    }
 }
