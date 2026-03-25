@@ -9,19 +9,17 @@ import { JwtAuthGuard } from './jwt-auth.guard';
 export class AuthController {
     constructor(private authService: AuthService) { }
 
-    @Get('session-portal')
-    async checkPortalSession(@Request() req) {
+    @Post('portal-session')
+    @HttpCode(HttpStatus.OK)
+    @ApiOperation({ summary: 'Hidratar sesión desde cookie del Portal Central' })
+    async portalSession(@Request() req) {
         const sid = req.cookies?.portal_sid;
-        if (!sid) return { authenticated: false };
+        if (!sid) throw new UnauthorizedException('Sesión de Portal no detectada');
 
         const user = await this.authService.validatePortalSession(sid);
-        if (!user) return { authenticated: false };
+        if (!user) throw new UnauthorizedException('Sesión de Portal inválida o caducada');
 
-        const tokenData = await this.authService.createTokenForUser(user);
-        return {
-            authenticated: true,
-            ...tokenData
-        };
+        return this.authService.createTokenForUser(user);
     }
 
     @Post('login')

@@ -37,24 +37,59 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [pais, setPais] = useState<string>('NI'); // Default to Nicaragua
 
   useEffect(() => {
-    const checkAuth = async () => {
+    let cancelled = false;
+
+    const bootstrapAuth = async () => {
       const token = localStorage.getItem('token');
-      if (token) {
+      const storedUser = localStorage.getItem('user');
+
+      if (token && storedUser) {
         try {
-          const storedUser = localStorage.getItem('user');
-          if (storedUser) {
+          if (!cancelled) {
             setUser(JSON.parse(storedUser));
           }
-        } catch (err) {
-          console.error('Auth check failed', err);
+          setLoading(false);
+          return;
+        } catch {
           localStorage.removeItem('token');
           localStorage.removeItem('user');
         }
       }
-      setLoading(false);
+
+      // Passive SSO Hydration
+      try {
+        const response = await fetch(`${import.meta.env.VITE_API_URL}/auth/portal-session`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+        });
+
+        if (response.ok) {
+          const payload = await response.json();
+          const { access_token, user: userData } = payload;
+
+          if (access_token && userData) {
+            if (!cancelled) {
+              localStorage.setItem('token', access_token);
+              localStorage.setItem('user', JSON.stringify(userData));
+              setUser(userData);
+            }
+          }
+        }
+      } catch (err) {
+        console.warn('Portal session bootstrap failed:', err);
+      } finally {
+        if (!cancelled) {
+          setLoading(false);
+        }
+      }
     };
 
-    checkAuth();
+    void bootstrapAuth();
+
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   const getDashboardUrl = (rol: string) => {
