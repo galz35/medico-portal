@@ -257,6 +257,9 @@ export class AuthService {
 
             console.log(`[SSO-DEBUG] Usuario listo para Login: ${user?.carnet} (ID: ${user?.id_usuario})`);
             return user;
+        } catch (error) {
+            this.logger.error(`[SSO] Error inesperado en validación: ${error.message}`);
+            return null;
         }
     }
 

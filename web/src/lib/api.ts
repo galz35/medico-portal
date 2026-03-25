@@ -1,7 +1,8 @@
 import axios from 'axios';
+import { API_BASE, appPath } from './runtime';
 
 const api = axios.create({
-    baseURL: import.meta.env.VITE_API_URL || '/api',
+    baseURL: API_BASE,
     withCredentials: true,
     headers: {
         'Content-Type': 'application/json',
@@ -29,7 +30,7 @@ api.interceptors.response.use(
             // We might want to dispatch an event or use the auth context here
             localStorage.removeItem('token');
             if (typeof window !== 'undefined' && !window.location.pathname.includes('/login')) {
-                window.location.href = '/login';
+                window.location.href = appPath('/login');
             }
         }
         return Promise.reject(error);

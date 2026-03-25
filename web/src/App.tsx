@@ -10,9 +10,11 @@ import { HistorialPaciente } from './components/medico/HistorialPaciente';
 import { Telemedicina } from './components/paciente/Telemedicina';
 import { CitaMedica, Paciente, EmpleadoEmp2024, CasoClinico } from './lib/types/domain';
 
+import { APP_BASE } from './lib/runtime';
+
 function App() {
   return (
-    <Router>
+    <Router basename={APP_BASE}>
       <AuthProvider>
         <Routes>
           <Route path="/" element={<Navigate to="/medico/agenda-citas" replace />} />
