@@ -19,6 +19,7 @@ import {
   History
 } from 'lucide-react';
 import { useAuth } from '@/hooks/use-auth';
+import { PORTAL_URL } from '@/lib/runtime';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { 
@@ -59,6 +60,11 @@ export function Sidebar() {
   const { user, logout, switchRole } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
+
+  const handleLogout = () => {
+    logout();
+    window.location.href = PORTAL_URL;
+  };
 
   const role = user?.rol || 'PACIENTE';
 
@@ -190,7 +196,7 @@ export function Sidebar() {
                     <span className="font-bold text-xs uppercase">Modo Paciente</span>
                 </DropdownMenuItem>
                 <DropdownMenuSeparator className="my-2" />
-                <DropdownMenuItem onClick={logout} className="rounded-xl p-2 cursor-pointer gap-2 text-rose-600 focus:text-rose-600 focus:bg-rose-50">
+                <DropdownMenuItem onClick={handleLogout} className="rounded-xl p-2 cursor-pointer gap-2 text-rose-600 focus:text-rose-600 focus:bg-rose-50">
                     <LogOut className="h-4 w-4" />
                     <span className="font-black text-xs uppercase tracking-widest">Cerrar Sesión</span>
                 </DropdownMenuItem>

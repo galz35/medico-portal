@@ -13,8 +13,10 @@ import { CitaMedica, Paciente, EmpleadoEmp2024, CasoClinico } from './lib/types/
 import { APP_BASE } from './lib/runtime';
 
 function App() {
+  const basename = APP_BASE === "/" ? undefined : APP_BASE.replace(/\/$/, "");
+
   return (
-    <Router basename={APP_BASE}>
+    <Router basename={basename}>
       <AuthProvider>
         <Routes>
           <Route path="/" element={<Navigate to="/medico/agenda-citas" replace />} />
