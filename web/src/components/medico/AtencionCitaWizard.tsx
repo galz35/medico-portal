@@ -1,6 +1,7 @@
 
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
+import { useParams } from 'react-router-dom';
 import { Card, CardContent } from "@/components/ui/card";
 import { StepHeaderWizard } from './StepHeaderWizard';
 import { Button } from '@/components/ui/button';
@@ -23,28 +24,41 @@ import { Step5_Cierre } from './steps/Step5_Cierre';
 
 const TOTAL_STEPS = 5;
 
-interface AtencionCitaWizardProps {
-    citaData: {
-        cita: CitaMedica;
-        paciente: Paciente;
-        empleado: EmpleadoEmp2024;
-        caso: CasoClinico;
-    };
-}
-
-export function AtencionCitaWizard({ citaData }: AtencionCitaWizardProps) {
+export function AtencionCitaWizard() {
+    const { idCita } = useParams();
     const { userProfile } = useUserProfile();
     const { toast } = useToast();
     const [step, setStep] = useState(1);
     const [showSummaryModal, setShowSummaryModal] = useState(false);
     const [isSaving, setIsSaving] = useState(false);
 
+    // Data fetching
+    const [citaData, setCitaData] = useState<any>(null);
+    const [isLoadingData, setIsLoadingData] = useState(true);
+
+    useEffect(() => {
+        const fetchData = async () => {
+            try {
+                if (idCita) {
+                    const data = await MedicoService.getAtencionMedicaData(idCita);
+                    setCitaData(data);
+                }
+            } catch (err) {
+                console.error("Error fetching cita", err);
+                toast({ title: 'Error', description: 'No se pudo cargar la cita.', variant: 'destructive' });
+            } finally {
+                setIsLoadingData(false);
+            }
+        };
+        fetchData();
+    }, [idCita]);
+
     // Main state for the medical attention
     const [atencion, setAtencion] = useState<AtencionMedica>({
         idAtencion: Date.now(),
-        idCita: citaData.cita.id || 0,
-        idCaso: citaData.cita.idCaso,
-        idMedico: userProfile?.idMedico || citaData.cita.idMedico || 0,
+        idCita: Number(idCita) || 0,
+        idCaso: 0,
+        idMedico: userProfile?.idMedico || 0,
         fechaAtencion: new Date().toISOString(),
         estadoClinico: 'BIEN',
         diagnosticoPrincipal: '',
@@ -54,14 +68,21 @@ export function AtencionCitaWizard({ citaData }: AtencionCitaWizardProps) {
     const [vacunas, setVacunas] = useState<VacunaAplicada[]>([]);
     const [psico, setPsico] = useState<RegistroPsicosocial>({
         idRegistroPsico: Date.now(),
-        idAtencion: (Date.now()).toString(), // Fixed potentially undefined
-        idPaciente: citaData.paciente.id || 0,
+        idAtencion: (Date.now()).toString(),
+        idPaciente: 0,
         idMedico: userProfile?.idMedico || 0,
         fechaRegistro: new Date().toISOString(),
         confidencial: true,
         sintomasPsico: [],
     });
     const [seguimientos, setSeguimientos] = useState<SeguimientoGenerado[]>([]);
+
+    useEffect(() => {
+        if (citaData) {
+            setAtencion(prev => ({ ...prev, idCaso: citaData.cita.idCaso }));
+            setPsico(prev => ({ ...prev, idPaciente: citaData.paciente.id || citaData.paciente.id_paciente || 0 }));
+        }
+    }, [citaData]);
 
     const handleNext = () => setStep(prev => Math.min(prev + 1, TOTAL_STEPS));
     const handlePrev = () => setStep(prev => Math.max(prev - 1, 1));
@@ -102,15 +123,23 @@ export function AtencionCitaWizard({ citaData }: AtencionCitaWizardProps) {
     };
 
 
-    const stepConfig = useMemo(() => [
-        { title: `Atención para: ${citaData.paciente.nombreCompleto}`, theme: 'primary', guide: 'Confirma los detalles de la cita y el contexto del paciente antes de continuar.' },
-        { title: 'Signos Vitales y Estado Clínico', theme: 'slate', guide: 'Registra los signos vitales básicos y define el estado clínico general del paciente en esta consulta.' },
-        { title: 'Diagnóstico y Plan', theme: 'green', guide: 'Establece el diagnóstico principal y detalla el plan de tratamiento y las recomendaciones.' },
-        { title: 'Seguimiento', theme: 'gray', guide: 'Determina si el paciente necesita una cita de seguimiento y genera el recordatorio correspondiente.' },
-        { title: 'Acciones Adicionales y Cierre', theme: 'dark', guide: 'Registra acciones de la empresa, notas psicosociales y revisa el resumen antes de guardar.' },
-    ], [citaData.paciente.nombreCompleto]);
+    const stepConfig = useMemo(() => {
+        const nombre = citaData?.paciente?.nombreCompleto || citaData?.paciente?.nombre_completo || 'Paciente';
+        return [
+            { title: `Atención para: ${nombre}`, theme: 'primary', guide: 'Confirma los detalles de la cita y el contexto del paciente antes de continuar.' },
+            { title: 'Signos Vitales y Estado Clínico', theme: 'slate', guide: 'Registra los signos vitales básicos y define el estado clínico general del paciente en esta consulta.' },
+            { title: 'Diagnóstico y Plan', theme: 'green', guide: 'Establece el diagnóstico principal y detalla el plan de tratamiento y las recomendaciones.' },
+            { title: 'Seguimiento', theme: 'gray', guide: 'Determina si el paciente necesita una cita de seguimiento y genera el recordatorio correspondiente.' },
+            { title: 'Acciones Adicionales y Cierre', theme: 'dark', guide: 'Registra acciones de la empresa, notas psicosociales y revisa el resumen antes de guardar.' },
+        ];
+    }, [citaData]);
 
     const currentStepConfig = stepConfig[step - 1];
+
+    if (isLoadingData) return <div className="p-8 text-center text-slate-500 font-medium">Cargando expediente médico...</div>;
+    if (!citaData) return <div className="p-8 text-center text-red-500 font-medium">Error: No se encontró la cita o expediente.</div>;
+
+    const idPaciente = citaData.paciente.id || citaData.paciente.id_paciente || 0;
 
     return (
         <Card className='overflow-hidden'>
@@ -125,8 +154,8 @@ export function AtencionCitaWizard({ citaData }: AtencionCitaWizardProps) {
                 {step === 1 && <Step1_Resumen citaData={citaData} />}
                 {step === 2 && <Step2_Vitales atencion={atencion} handleChange={handleChangeAtencion} />}
                 {step === 3 && <Step3_Diagnostico atencion={atencion} handleChange={handleChangeAtencion} />}
-                {step === 4 && <Step4_Seguimiento atencion={atencion} handleChange={handleChangeAtencion} setSeguimientos={setSeguimientos} idPaciente={citaData.paciente.id!} />}
-                {step === 5 && <Step5_Cierre atencion={atencion} vacunas={vacunas} setVacunas={setVacunas} psico={psico} setPsico={handleUpdatePsico} idPaciente={citaData.paciente.id!.toString()} />}
+                {step === 4 && <Step4_Seguimiento atencion={atencion} handleChange={handleChangeAtencion} setSeguimientos={setSeguimientos} idPaciente={idPaciente} />}
+                {step === 5 && <Step5_Cierre atencion={atencion} vacunas={vacunas} setVacunas={setVacunas} psico={psico} setPsico={handleUpdatePsico} idPaciente={idPaciente.toString()} />}
 
                 <div className="mt-8 flex justify-between">
                     <Button variant="outline" onClick={handlePrev} disabled={step === 1 || isSaving}>
@@ -164,7 +193,7 @@ export function AtencionCitaWizard({ citaData }: AtencionCitaWizardProps) {
                                 <Label className="text-[10px] font-black uppercase text-slate-400 tracking-widest flex items-center gap-1">
                                     <Stethoscope className="h-3 w-3" /> Paciente
                                 </Label>
-                                <p className="text-sm font-black text-slate-900 truncate uppercase mt-1 leading-none">{citaData.paciente.nombreCompleto}</p>
+                                <p className="text-sm font-black text-slate-900 truncate uppercase mt-1 leading-none">{citaData.paciente?.nombreCompleto || citaData.paciente?.nombre_completo || 'Paciente'}</p>
                             </div>
                             <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100 space-y-1">
                                 <Label className="text-[10px] font-black uppercase text-slate-400 tracking-widest flex items-center gap-1">
@@ -178,7 +207,7 @@ export function AtencionCitaWizard({ citaData }: AtencionCitaWizardProps) {
                             <Label className="text-[10px] font-black uppercase text-slate-400 tracking-widest">Resumen de Acciones</Label>
                             <div className="flex flex-wrap gap-2">
                                 <Badge variant="outline" className="rounded-xl py-1 px-3 border-emerald-100 bg-emerald-50 text-emerald-700 font-bold text-[10px] uppercase">
-                                    Atención #{atencion.idAtencion.toString().slice(-4)}
+                                    Atención #{atencion.idAtencion?.toString().slice(-4) || 'N/A'}
                                 </Badge>
                                 {atencion.requiereSeguimiento && (
                                     <Badge variant="outline" className="rounded-xl py-1 px-3 border-indigo-100 bg-indigo-50 text-indigo-700 font-bold text-[10px] uppercase">

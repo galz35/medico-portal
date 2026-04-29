@@ -2,7 +2,7 @@
 
 import React from 'react';
 import type { DatosExtraJSON } from '@/lib/types/solicitud';
-import { Chip, ChipGroup } from '../Chip';
+import { Chip, ChipGroup } from './Chip';
 import { Textarea } from '@/components/ui/textarea';
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { Label } from '@/components/ui/label';

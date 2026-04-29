@@ -2,7 +2,7 @@
 
 import React from 'react';
 import type { RutaMotivo, ModalidadTrabajo, DatosExtraJSON } from '@/lib/types/solicitud';
-import { Chip, ChipGroup } from '../Chip';
+import { Chip, ChipGroup } from './Chip';
 import { Textarea } from '@/components/ui/textarea';
 
 interface Step1Props {

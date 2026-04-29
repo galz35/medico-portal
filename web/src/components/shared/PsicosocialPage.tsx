@@ -63,9 +63,9 @@ export default function PsicosocialPage() {
             // Wait, I didn't see getRegistrosPsicosociales in MedicoService. I should add it.
             // For now, let's assume I will add it.
             const pacientesData = await MedicoService.getPacientes(pais);
-            // const registrosData = await MedicoService.getRegistrosPsicosociales(pais); 
+            const registrosData = await MedicoService.getRegistrosPsicosociales(pais); 
             setPacientes(pacientesData);
-            // setRegistros(registrosData);
+            setRegistros(registrosData);
         } catch (error) {
             toast({ variant: 'destructive', title: 'Error', description: 'No se pudieron cargar los datos.' });
         }
@@ -109,10 +109,11 @@ export default function PsicosocialPage() {
         try {
             const payload: Omit<RegistroPsicosocial, 'id' | 'idRegistroPsico'> = {
                 ...data,
+                idPaciente: Number(data.idPaciente),
                 idMedico: userProfile.idMedico,
                 fechaRegistro: new Date().toISOString(),
             };
-            // await MedicoService.crearRegistroPsicosocial(payload);
+            await MedicoService.crearRegistroPsicosocial(payload);
             toast({ title: 'Registro Guardado', description: 'La evaluación psicosocial se ha guardado correctamente.' });
             form.reset({ sintomasPsico: [], riesgoSuicida: false, derivarAPsico: false });
             fetchData();
@@ -126,21 +127,21 @@ export default function PsicosocialPage() {
     const registrosConPaciente = useMemo(() => {
         return registros.map(reg => ({
             ...reg,
-            paciente: pacientes.find(p => p.id === reg.idPaciente)
-        })).sort((a, b) => new Date(b.fechaRegistro).getTime() - new Date(a.fechaRegistro).getTime());
+            paciente: pacientes.find(p => p.id === reg.idPaciente || p.id_paciente === reg.idPaciente)
+        })).sort((a, b) => new Date(b.fechaRegistro || 0).getTime() - new Date(a.fechaRegistro || 0).getTime());
     }, [registros, pacientes]);
 
     const columns = [
-        { accessor: (row: any) => new Date(row.fechaRegistro).toLocaleDateString(), header: 'Fecha' },
-        { accessor: (row: any) => row.paciente?.nombreCompleto || 'N/A', header: 'Paciente' },
-        { accessor: 'nivelEstres', header: 'Nivel Estrés' },
+        { accessor: (row: any) => new Date(row.fechaRegistro || 0).toLocaleDateString(), header: 'Fecha' },
+        { accessor: (row: any) => row.paciente?.nombreCompleto || row.paciente?.nombre_completo || 'N/A', header: 'Paciente' },
+        { accessor: (row: any) => row.nivelEstres || 'N/A', header: 'Nivel Estrés' },
         {
-            accessor: 'analisisSentimiento',
+            accessor: (row: any) => row.analisisSentimiento || 'N/A',
             header: 'Sentimiento IA',
             cell: (row: any) => row.analisisSentimiento ? <Badge className={cn(getSentimentClass(row.analisisSentimiento), "border-transparent")}>{row.analisisSentimiento}</Badge> : 'N/A'
         },
         {
-            accessor: 'riesgoSuicida',
+            accessor: (row: any) => row.riesgoSuicida ? 'Riesgo' : (row.derivarAPsico ? 'Derivar' : 'OK'),
             header: 'Alerta',
             cell: (row: any) => row.riesgoSuicida ? <Badge variant="destructive">Riesgo Suicida</Badge> : (row.derivarAPsico ? <Badge variant="secondary">Derivar</Badge> : '-')
         },
@@ -162,7 +163,7 @@ export default function PsicosocialPage() {
                                     <FormField control={form.control} name="idPaciente" render={({ field }) => (
                                         <FormItem><FormLabel>Paciente</FormLabel>
                                             <Select onValueChange={field.onChange} defaultValue={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Seleccione un paciente..." /></SelectTrigger></FormControl>
-                                                <SelectContent>{pacientes.map(p => <SelectItem key={p.id} value={p.id!}>{p.nombreCompleto}</SelectItem>)}</SelectContent>
+                                                <SelectContent>{pacientes.map(p => <SelectItem key={p.id || p.id_paciente} value={(p.id || p.id_paciente || 0).toString()}>{p.nombreCompleto || p.nombre_completo}</SelectItem>)}</SelectContent>
                                             </Select><FormMessage />
                                         </FormItem>)}
                                     />

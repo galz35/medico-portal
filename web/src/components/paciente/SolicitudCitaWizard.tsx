@@ -13,10 +13,10 @@ import { useUserProfile } from '@/hooks/use-user-profile';
 import { useToast } from '@/hooks/use-toast';
 
 // Sub-components for steps
-import { Step1_EstadoHoy } from './steps-solicitud/Step1_EstadoHoy';
-import { Step2_Sintomas } from './steps-solicitud/Step2_Sintomas';
-import { Step3_Habitos } from './steps-solicitud/Step3_Habitos';
-import { Step4_Revision } from './steps-solicitud/Step4_Revision';
+import { Step1_EstadoHoy } from './Step1_EstadoHoy';
+import { Step2_Sintomas } from './Step2_Sintomas';
+import { Step3_Habitos } from './Step3_Habitos';
+import { Step4_Revision } from './Step4_Revision';
 
 const TOTAL_STEPS = 4;
 

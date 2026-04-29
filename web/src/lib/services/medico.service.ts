@@ -82,8 +82,8 @@ export const MedicoService = {
         return response.data;
     },
 
-    getAtencionMedicaData: async (citaId: string): Promise<AtencionPageData> => {
-        const cita = await MedicoService.getCitaById(citaId);
+    getAtencionMedicaData: async (citaId: string | number): Promise<AtencionPageData> => {
+        const cita = await MedicoService.getCitaById(citaId.toString());
         return {
             cita: cita,
             paciente: cita.paciente,
@@ -103,6 +103,14 @@ export const MedicoService = {
 
     registrarVacuna: async (data: any) => {
         const response = await api.post('/medico/vacunas', data);
+        return response.data;
+    },
+    getRegistrosPsicosociales: async (pais?: string) => {
+        const response = await api.get('/medico/psicosocial', { params: { pais } });
+        return response.data;
+    },
+    crearRegistroPsicosocial: async (data: any) => {
+        const response = await api.post('/medico/psicosocial', data);
         return response.data;
     }
 };

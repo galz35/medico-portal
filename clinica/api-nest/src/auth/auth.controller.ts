@@ -46,6 +46,7 @@ export class AuthController {
         return this.authService.getProfile(req.user.idUsuario);
     }
 
+    @UseGuards(JwtAuthGuard)
     @Post('reset-password')
     @HttpCode(HttpStatus.OK)
     @ApiOperation({ summary: 'Reiniciar contraseña (Primer acceso o recuperación)' })

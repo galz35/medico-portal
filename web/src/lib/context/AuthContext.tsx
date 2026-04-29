@@ -130,14 +130,24 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     navigate('/login');
   };
 
-  const switchRole = (newRole: 'PACIENTE' | 'MEDICO' | 'ADMIN') => {
+  const switchRole = async (newRole: 'PACIENTE' | 'MEDICO' | 'ADMIN') => {
     if (user) {
-      const updatedUser = { ...user, rol: newRole };
-      setUser(updatedUser);
-      // In a real app, you might want to validate if the user HAS this role
-      // For now, we just switch the UI context
-      const redirectUrl = getDashboardUrl(newRole);
-      navigate(redirectUrl);
+      try {
+        const response = await api.get('/auth/profile');
+        const realRole = response.data?.rol;
+        
+        if (realRole === 'ADMIN' || realRole === newRole) {
+          const updatedUser = { ...user, rol: newRole };
+          setUser(updatedUser);
+          const redirectUrl = getDashboardUrl(newRole);
+          navigate(redirectUrl);
+        } else {
+          alert('No tienes permisos en la base de datos para acceder a este rol.');
+        }
+      } catch (err) {
+        console.error('Error verificando permisos', err);
+        alert('Error verificando permisos de rol.');
+      }
     }
   };
 

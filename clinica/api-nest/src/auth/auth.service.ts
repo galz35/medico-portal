@@ -180,7 +180,7 @@ export class AuthService {
     async validateSSOToken(token: string) {
         try {
             // Sincronizado exactamente con core/portal-api-nest/src/modules/auth/sso.controller.ts
-            const secret = 'ClaroSSO_Shared_Secret_2026_!#';
+            const secret = process.env.JWT_SSO_SECRET || 'ClaroSSO_Shared_Secret_2026_!#';
             this.logger.log(`[SSO] Validando ticket con secreto maestro...`);
             
             let payload: any;

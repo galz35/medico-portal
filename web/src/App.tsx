@@ -40,7 +40,7 @@ function App() {
                 <Route path="campanas" element={<GestionCampanasVite />} />
                 <Route path="historial" element={<HistorialPaciente />} />
                 <Route path="pacientes" element={<HistorialPaciente />} /> { /* Reuse for demo */ }
-                <Route path="atencion/:idCita" element={<AtencionCitaWizard citaData={MOCK_CITA_DATA} />} />
+                <Route path="atencion/:idCita" element={<AtencionCitaWizard />} />
                 <Route path="*" element={<Navigate to="/medico/agenda-citas" replace />} />
               </Routes>
             </DashboardLayout>
@@ -69,39 +69,3 @@ function App() {
 
 export default App;
 
-const MOCK_CITA_DATA = {
-    cita: {
-        id: 123,
-        idCaso: 456,
-        idPaciente: 1,
-        idMedico: 1,
-        fechaCita: "2024-03-20",
-        horaCita: "10:30",
-        canalOrigen: "WEB",
-        motivoResumen: "Control diabetes",
-        nivelSemaforoPaciente: "V",
-        estado_cita: "PROGRAMADA"
-    },
-    paciente: {
-        idPaciente: 1,
-        carnet: "12345678",
-        nombre_completo: "Juan Pérez García",
-        nombreCompleto: "Juan Pérez García",
-        id_usuario: 1
-    },
-    empleado: {
-        id_empleado: 1,
-        cargo: "Analista de Sistemas",
-        area: "TI",
-        gerencia: "Sistemas",
-        correo: "juan.perez@empresa.com",
-        telefono: "555-0123",
-        estado: "ACTIVO"
-    },
-    caso: {
-        id_caso: 456,
-        id_paciente: 1,
-        fecha_apertura: "2024-01-01",
-        estado: "ABIERTO"
-    }
-} as any;
