@@ -19,6 +19,14 @@ class AuthRepository {
   static const _keyUserMail = 'user_mail';
   static const _keyUserRol = 'user_rol';
   static const _keyUserPais = 'user_pais';
+  static const _keyUserIdMedico = 'user_id_medico';
+
+  int? _asNullableInt(dynamic value) {
+    if (value is int) return value;
+    if (value is num) return value.toInt();
+    if (value is String) return int.tryParse(value);
+    return null;
+  }
 
   Future<SessionUser> login({required String carnet, required String password}) async {
     final response = await _dio.post('auth/login', data: {
@@ -37,6 +45,7 @@ class AuthRepository {
       correo: (usuario['correo'] ?? '') as String,
       rol: (usuario['rol'] ?? '') as String,
       pais: (usuario['pais'] ?? '') as String,
+      idMedico: _asNullableInt(usuario['id_medico']),
     );
 
     await _storage.write(key: _keyAccess, value: accessToken);
@@ -46,6 +55,9 @@ class AuthRepository {
     await _storage.write(key: _keyUserMail, value: user.correo);
     await _storage.write(key: _keyUserRol, value: user.rol);
     await _storage.write(key: _keyUserPais, value: user.pais);
+    if (user.idMedico != null) {
+      await _storage.write(key: _keyUserIdMedico, value: user.idMedico.toString());
+    }
 
     _dio.options.headers['Authorization'] = 'Bearer $accessToken';
     return user;
@@ -63,6 +75,7 @@ class AuthRepository {
       correo: (await _storage.read(key: _keyUserMail)) ?? '',
       rol: (await _storage.read(key: _keyUserRol)) ?? '',
       pais: (await _storage.read(key: _keyUserPais)) ?? '',
+      idMedico: int.tryParse((await _storage.read(key: _keyUserIdMedico)) ?? ''),
     );
 
     _dio.options.headers['Authorization'] = 'Bearer $accessToken';

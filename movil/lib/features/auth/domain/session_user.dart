@@ -5,6 +5,7 @@ class SessionUser {
   final String correo;
   final String rol;
   final String pais;
+  final int? idMedico;
 
   SessionUser({
     required this.id,
@@ -13,5 +14,6 @@ class SessionUser {
     required this.correo,
     required this.rol,
     required this.pais,
+    this.idMedico,
   });
 }

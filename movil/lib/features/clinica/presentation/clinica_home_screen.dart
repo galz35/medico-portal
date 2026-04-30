@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
-import 'package:intl/intl.dart';
+import 'package:provider/provider.dart';
+import '../../auth/presentation/auth_controller.dart';
 import '../../home/presentation/home_shell.dart';
 import '../data/clinica_repository.dart';
 import '../domain/cita.dart';
+import 'atencion_cita_screen.dart';
 
 class ClinicaHomeScreen extends StatefulWidget {
   const ClinicaHomeScreen({super.key});
@@ -178,7 +180,19 @@ class _ClinicaHomeScreenState extends State<ClinicaHomeScreen> {
                         width: double.infinity,
                         child: ElevatedButton(
                           onPressed: () {
-                            // TODO: Abrir pantalla de atención
+                            final user = context.read<AuthController>().user;
+                            if (user == null) return;
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => AtencionCitaScreen(
+                                  cita: cita,
+                                  user: user,
+                                ),
+                              ),
+                            ).then((saved) {
+                              if (saved == true) _loadData();
+                            });
                           },
                           style: ElevatedButton.styleFrom(
                             backgroundColor: Colors.blue,
