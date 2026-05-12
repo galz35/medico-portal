@@ -2,10 +2,12 @@ import { Controller, Get, Post, Body, Param, Put, Delete, UseGuards, Request } f
 import { SeguimientoService } from './seguimiento.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RolesGuard } from '../auth/roles.guard';
+import { Roles } from '../auth/roles.decorator';
 import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
 
 @ApiTags('seguimientos')
 @ApiBearerAuth()
+@Roles('MEDICO', 'ADMIN')
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Controller('seguimientos')
 export class SeguimientoController {

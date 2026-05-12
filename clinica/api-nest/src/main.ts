@@ -9,6 +9,13 @@ import { AppModule } from './app.module';
 import { GlobalErrorFilter } from './common/filters/global-error.filter';
 
 async function bootstrap() {
+  if (process.env.NODE_ENV === 'production' && (!process.env.JWT_SECRET || process.env.JWT_SECRET === 'secret')) {
+    throw new Error('JWT_SECRET must be set to a strong value in production');
+  }
+  if (process.env.NODE_ENV === 'production' && (!process.env.COOKIE_SECRET || process.env.COOKIE_SECRET === 'secret-ultra-seguro-portal')) {
+    throw new Error('COOKIE_SECRET must be set to a strong value in production');
+  }
+
   // 1. Backend REST veloz usando Fastify
   const app = await NestFactory.create<NestFastifyApplication>(
     AppModule,
@@ -17,7 +24,7 @@ async function bootstrap() {
 
   // Registrar cookies
   await app.register(require('@fastify/cookie'), {
-    secret: process.env.COOKIE_SECRET || 'secret-ultra-seguro-portal',
+    secret: process.env.COOKIE_SECRET,
   });
 
   // 2. Conexión de entorno gRPC
