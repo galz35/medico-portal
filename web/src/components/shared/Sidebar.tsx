@@ -132,16 +132,7 @@ export function Sidebar() {
           />
         ))}
 
-        <div className="mt-8">
-            <SidebarItem
-                icon={Settings}
-                label="Preferencias"
-                path="/configuracion"
-                isActive={location.pathname.startsWith("/configuracion")}
-                isCollapsed={collapsed}
-                onClick={() => navigate("/configuracion")}
-            />
-        </div>
+
       </div>
 
       {/* Navigation Toggle Button (Floating style) */}
