@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
@@ -27,19 +27,42 @@ import {
   DialogDescription,
   DialogFooter
 } from "@/components/ui/dialog";
+import { MedicoService } from '@/lib/services/medico.service';
+import type { Paciente } from '@/lib/types/domain';
 
 export function HistorialPaciente() {
     const [searchTerm, setSearchTerm] = useState('');
     const [dateFrom, setDateFrom] = useState('');
     const [dateTo, setDateTo] = useState('');
+    const [pacientes, setPacientes] = useState<Paciente[]>([]);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState<string | null>(null);
 
-    // Mock de historial extendido (como en el legacy)
-    const [registros] = useState([
-        { id: 101, fecha: '2024-03-18 09:45', carnet: '102938', nombre: 'Carlos Ruiz', gerencia: 'Sistemas', area: 'TI', modalidad: 'Oficina', apto: true, triage: 'V', comentario: 'Control rutinario de presión.' },
-        { id: 102, fecha: '2024-03-17 14:20', carnet: '102940', nombre: 'Elena Sosa', gerencia: 'RRHH', area: 'Nómina', modalidad: 'Remoto', apto: false, triage: 'R', comentario: 'Persistente dolor de cabeza e hipertensión.' },
-        { id: 103, fecha: '2024-03-16 10:15', carnet: '102945', nombre: 'Luis Mejía', gerencia: 'Ventas', area: 'Campo', modalidad: 'Presencial', apto: true, triage: 'A', comentario: 'Molestia leve en rodilla derecha.' },
-        { id: 104, fecha: '2024-03-15 08:30', carnet: '102950', nombre: 'Ana Bueso', gerencia: 'Sistemas', area: 'Desarrollo', modalidad: 'Oficina', apto: true, triage: 'V', comentario: 'Visita preventiva.' },
-    ]);
+    useEffect(() => {
+        setLoading(true);
+        setError(null);
+        MedicoService.getPacientes()
+            .then(data => {
+                setPacientes(Array.isArray(data) ? data : []);
+            })
+            .catch(err => {
+                setError(err?.response?.data?.message || err?.message || 'Error al cargar pacientes');
+            })
+            .finally(() => setLoading(false));
+    }, []);
+
+    const registros = pacientes.map((p, idx) => ({
+        id: p.id_paciente ?? idx + 1,
+        fecha: p.fecha_nacimiento ? new Date(p.fecha_nacimiento).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
+        carnet: p.carnet,
+        nombre: p.nombre_completo,
+        gerencia: p.gerencia || 'Sin asignar',
+        area: p.area || 'General',
+        modalidad: p.pais === 'NI' ? 'Presencial' : 'Remoto',
+        apto: p.estado_paciente === 'A',
+        triage: p.nivel_semaforo || 'V',
+        comentario: `Paciente registrado. Último semáforo: ${p.nivel_semaforo || 'N/A'}`
+    }));
 
     const filtered = registros.filter(r => 
         r.nombre.toLowerCase().includes(searchTerm.toLowerCase()) || 
@@ -92,6 +115,16 @@ export function HistorialPaciente() {
                     </div>
                 </CardHeader>
                 <CardContent className="p-0">
+                    {loading ? (
+                        <div className="flex items-center justify-center h-40">
+                            <div className="h-6 w-6 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+                            <span className="ml-3 text-slate-500 font-medium">Cargando pacientes...</span>
+                        </div>
+                    ) : error ? (
+                        <div className="flex items-center justify-center h-40 text-red-500 font-medium">
+                            Error: {error}
+                        </div>
+                    ) : (
                     <Table>
                         <TableHeader className="bg-slate-50/50">
                             <TableRow className="hover:bg-transparent border-slate-100 italic">
@@ -104,7 +137,7 @@ export function HistorialPaciente() {
                             </TableRow>
                         </TableHeader>
                         <TableBody>
-                            {filtered.map((r) => (
+                            {filtered.length > 0 ? filtered.map((r) => (
                                 <TableRow key={r.id} className="hover:bg-slate-50/50 transition-colors border-slate-50 group">
                                     <TableCell className="py-5 pl-8">
                                         <p className="font-black text-slate-900 uppercase text-[11px] tracking-tight">{r.fecha}</p>
@@ -206,9 +239,16 @@ export function HistorialPaciente() {
                                         </div>
                                     </TableCell>
                                 </TableRow>
-                            ))}
+                            )) : (
+                                <TableRow>
+                                    <TableCell colSpan={6} className="h-32 text-center text-slate-400 font-medium italic">
+                                        No se encontraron pacientes con los criterios de búsqueda.
+                                    </TableCell>
+                                </TableRow>
+                            )}
                         </TableBody>
                     </Table>
+                    )}
                 </CardContent>
             </Card>
         </div>

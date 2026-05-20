@@ -53,6 +53,15 @@ export function GestionCampanasVite() {
 
     return (
         <div className="space-y-6 animate-in slide-in-from-bottom-4 duration-500 pb-10">
+            <div className="bg-amber-50 border border-amber-200 p-4 rounded-xl">
+                <p className="text-amber-800 font-bold text-sm flex items-center gap-2">
+                    ⚠ Módulo Pendiente de Implementación
+                </p>
+                <p className="text-amber-700 text-xs mt-1">
+                    Esta pantalla usa datos de demostración. El backend de campañas de vacunación 
+                    aún no está implementado. Los datos mostrados no son reales.
+                </p>
+            </div>
             {/* Campaña Header Card */}
             <Card className="border-none shadow-xl bg-slate-900 text-white overflow-hidden relative">
                 <div className="absolute top-0 right-0 p-12 opacity-5 pointer-events-none">

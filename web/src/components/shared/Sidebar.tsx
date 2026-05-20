@@ -79,10 +79,6 @@ export function Sidebar() {
     ],
     ADMIN: [
       { icon: BarChart3, label: 'Métricas Globales', path: '/admin/dashboard' },
-      { icon: UserCog, label: 'Gestión Médica', path: '/admin/medicos' },
-      { icon: Users, label: 'Censo de Pacientes', path: '/admin/pacientes' },
-      { icon: Activity, label: 'Reportes Epidemiol.', path: '/admin/reportes' },
-      { icon: ShieldCheck, label: 'Auditoría SSO', path: '/admin/auditoria' },
     ],
     PACIENTE: [
       { icon: LayoutDashboard, label: 'Mi Panel Salud', path: '/paciente/dashboard' },

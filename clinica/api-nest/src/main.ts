@@ -15,6 +15,9 @@ async function bootstrap() {
   if (process.env.NODE_ENV === 'production' && (!process.env.COOKIE_SECRET || process.env.COOKIE_SECRET === 'secret-ultra-seguro-portal')) {
     throw new Error('COOKIE_SECRET must be set to a strong value in production');
   }
+  if (process.env.NODE_ENV === 'production' && !process.env.JWT_SSO_SECRET) {
+    console.warn('WARN: JWT_SSO_SECRET no configurado. Usando secreto compartido por defecto.');
+  }
 
   // 1. Backend REST veloz usando Fastify
   const app = await NestFactory.create<NestFastifyApplication>(

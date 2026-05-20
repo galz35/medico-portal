@@ -12,6 +12,7 @@ import { GestionCampanasVite } from './components/medico/GestionCampanasVite';
 import { HistorialPaciente } from './components/medico/HistorialPaciente';
 import { Telemedicina } from './components/paciente/Telemedicina';
 import { LoginPage } from './components/auth/LoginPage';
+import { SSOHandlerPage } from './components/auth/SSOHandlerPage';
 import { ProtectedRoute } from './components/auth/ProtectedRoute';
 
 import { APP_BASE } from './lib/runtime';
@@ -24,6 +25,7 @@ function App() {
       <AuthProvider>
         <Routes>
           <Route path="/login" element={<LoginPage />} />
+          <Route path="/auth/sso" element={<SSOHandlerPage />} />
           <Route path="/" element={<Navigate to="/login" replace />} />
 
           {/* Admin Routes */}

@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
   Plus, 
@@ -45,85 +45,42 @@ import { Label } from "@/components/ui/label";
 import { SemaforoBadge } from "@/components/shared/SemaforoBadge";
 import { CitaMedica } from '@/lib/types/domain';
 import { cn } from '@/lib/utils';
+import { MedicoService } from '@/lib/services/medico.service';
 
 export function AgendaCitas() {
   const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState('');
   const [activeFilter, setActiveFilter] = useState<'HOY' | 'MANANA' | 'TODOS'>('HOY');
   const [isNewCitaOpen, setIsNewCitaOpen] = useState(false);
+  const [citas, setCitas] = useState<CitaMedica[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  // MOCK DATA for appointments
-  const mockCitas: CitaMedica[] = [
-    {
-        id: 101,
-        idCaso: 456,
-        idPaciente: 1,
-        idMedico: 1,
-        fechaCita: new Date().toISOString(),
-        horaCita: "08:30",
-        canalOrigen: "Portal WEB",
-        estadoCita: 'CONFIRMADA' as any,
-        motivoResumen: "Control de diabetes y revisión de laboratorio.",
-        nivelSemaforoPaciente: 'V' as any,
-        paciente_nombre: "Juan Pérez",
-        paciente_carnet: "12345678"
-    },
-    {
-        id: 102,
-        idCaso: 457,
-        idPaciente: 2,
-        idMedico: 1,
-        fechaCita: new Date().toISOString(),
-        horaCita: "09:30",
-        canalOrigen: "APP Móvil",
-        estadoCita: 'PROGRAMADA' as any,
-        motivoResumen: "Dolor lumbar crónico.",
-        nivelSemaforoPaciente: 'A' as any,
-        paciente_nombre: "María Rodríguez",
-        paciente_carnet: "87654321"
-    },
-    {
-        id: 103,
-        idCaso: 458,
-        idPaciente: 3,
-        idMedico: 1,
-        fechaCita: new Date().toISOString(),
-        horaCita: "10:00",
-        canalOrigen: "Presencial",
-        estadoCita: 'EN_ATENCION' as any,
-        motivoResumen: "Fiebre persistente y escalofríos.",
-        nivelSemaforoPaciente: 'R' as any,
-        paciente_nombre: "Carlos Gómez",
-        paciente_carnet: "11223344"
-    },
-    {
-        id: 104,
-        idCaso: 459,
-        idPaciente: 4,
-        idMedico: 1,
-        fechaCita: new Date().toISOString(),
-        horaCita: "11:30",
-        canalOrigen: "Telemedicina",
-        estadoCita: 'PROGRAMADA' as any,
-        motivoResumen: "Revisión de resultados de rayos X.",
-        nivelSemaforoPaciente: 'V' as any,
-        paciente_nombre: "Ana Martínez",
-        paciente_carnet: "55667788"
-    }
-  ] as any[];
+  useEffect(() => {
+    setLoading(true);
+    setError(null);
+    MedicoService.getAgendaCitas()
+      .then(data => {
+        setCitas(Array.isArray(data) ? data : []);
+      })
+      .catch(err => {
+        setError(err?.response?.data?.message || err?.message || 'Error al cargar agenda');
+      })
+      .finally(() => setLoading(false));
+  }, []);
 
   const filteredCitas = useMemo(() => {
-    return mockCitas.filter(cita => 
+    return citas.filter(cita => 
         (cita.paciente_nombre?.toLowerCase().includes(searchQuery.toLowerCase()) || 
          cita.paciente_carnet?.includes(searchQuery))
     );
-  }, [searchQuery, mockCitas]);
+  }, [searchQuery, citas]);
 
   const stats = {
-    total: mockCitas.length,
-    atendidas: 1,
-    pendientes: 3,
-    urgentes: 1
+    total: citas.length,
+    atendidas: citas.filter(c => c.estado_cita === 'FINALIZADA' || c.estadoCita === 'FINALIZADA').length,
+    pendientes: citas.filter(c => c.estado_cita === 'PROGRAMADA' || c.estado_cita === 'CONFIRMADA' || c.estadoCita === 'PROGRAMADA' || c.estadoCita === 'CONFIRMADA').length,
+    urgentes: citas.filter(c => (c.nivel_semaforo_paciente || c.nivelSemaforoPaciente) === 'R').length
   };
 
   return (
@@ -238,13 +195,21 @@ export function AgendaCitas() {
                    onChange={(e) => setSearchQuery(e.target.value)}
                 />
               </div>
-              <Button variant="outline" size="icon" className="h-10 w-10 border-slate-200">
-                 <Filter size={18} className="text-slate-500" />
-              </Button>
             </div>
           </div>
         </CardHeader>
         <CardContent className="p-0">
+          {loading ? (
+            <div className="flex items-center justify-center h-40">
+              <div className="h-6 w-6 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+              <span className="ml-3 text-slate-500 font-medium">Cargando agenda...</span>
+            </div>
+          ) : error ? (
+            <div className="flex items-center justify-center h-40 text-red-500 font-medium">
+              Error: {error}
+            </div>
+          ) : (
+            <>
           <Table>
             <TableHeader className="bg-slate-50/50">
               <TableRow>
@@ -259,8 +224,8 @@ export function AgendaCitas() {
             <TableBody>
               {filteredCitas.length > 0 ? (
                 filteredCitas.map((cita) => (
-                  <TableRow key={cita.id} className="hover:bg-slate-50 transition-colors border-b">
-                    <TableCell className="pl-6 font-bold text-slate-900 border-r border-slate-50">{cita.horaCita}</TableCell>
+                  <TableRow key={cita.id_cita ?? cita.id} className="hover:bg-slate-50 transition-colors border-b">
+                    <TableCell className="pl-6 font-bold text-slate-900 border-r border-slate-50">{cita.hora_cita ?? cita.horaCita}</TableCell>
                     <TableCell>
                       <div className="flex flex-col">
                         <span className="font-bold text-slate-800">{cita.paciente_nombre}</span>
@@ -271,20 +236,20 @@ export function AgendaCitas() {
                       <Badge 
                         className={cn(
                           "px-2 py-0.5 text-[10px] font-bold uppercase rounded-full border-none",
-                          cita.estadoCita === 'EN_ATENCION' ? "bg-primary text-white" :
-                          cita.estadoCita === 'CONFIRMADA' ? "bg-green-100 text-green-700 hover:bg-green-200" :
+                          (cita.estado_cita ?? cita.estadoCita) === 'EN_ATENCION' ? "bg-primary text-white" :
+                          (cita.estado_cita ?? cita.estadoCita) === 'CONFIRMADA' ? "bg-green-100 text-green-700 hover:bg-green-200" :
                           "bg-slate-100 text-slate-600"
                         )}
                       >
-                        {cita.estadoCita?.replace('_', ' ')}
+                        {(cita.estado_cita ?? cita.estadoCita)?.replace('_', ' ')}
                       </Badge>
                     </TableCell>
                     <TableCell className="hidden md:table-cell">
-                        <p className="text-xs text-slate-500 max-w-[200px] truncate font-medium">{cita.motivoResumen}</p>
+                        <p className="text-xs text-slate-500 max-w-[200px] truncate font-medium">{cita.motivo_resumen ?? cita.motivoResumen}</p>
                     </TableCell>
                     <TableCell className="text-center">
                         <div className="flex justify-center">
-                           <SemaforoBadge nivel={cita.nivelSemaforoPaciente as any} />
+                           <SemaforoBadge nivel={(cita.nivel_semaforo_paciente ?? cita.nivelSemaforoPaciente) as any} />
                         </div>
                     </TableCell>
                     <TableCell className="pr-6 text-right">
@@ -292,7 +257,7 @@ export function AgendaCitas() {
                          variant="default" 
                          size="sm" 
                          className="h-8 font-bold text-[11px] px-4 rounded-md shadow-sm bg-primary hover:bg-primary/90"
-                         onClick={() => navigate(`/medico/atencion/${cita.id}`)}
+                         onClick={() => navigate(`/medico/atencion/${cita.id_cita ?? cita.id}`)}
                        >
                          ATENDER
                        </Button>
@@ -310,13 +275,10 @@ export function AgendaCitas() {
           </Table>
           
           <div className="p-4 flex items-center justify-between border-t text-sm font-medium text-slate-500 bg-slate-50/30">
-             <span>Mostrando {filteredCitas.length} citas filtradas</span>
-             <div className="flex gap-1">
-                <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-400"><ChevronLeft size={16}/></Button>
-                <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-900 bg-white shadow-sm border">1</Button>
-                <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-400"><ChevronRight size={16}/></Button>
-             </div>
+             <span>Mostrando {filteredCitas.length} citas</span>
           </div>
+            </>
+          )}
         </CardContent>
       </Card>
       

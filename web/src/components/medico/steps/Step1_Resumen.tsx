@@ -1,9 +1,11 @@
+import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { SemaforoBadge } from '@/components/shared/SemaforoBadge';
 import { AtencionHistorial } from '../AtencionHistorial';
 import type { CitaMedica, Paciente, EmpleadoEmp2024, CasoClinico } from '@/lib/types/domain';
 import { Badge } from '@/components/ui/badge';
 import { Database, User, Calendar, MapPin, Briefcase, Mail, Phone, Info } from 'lucide-react';
+import { MedicoService } from '@/lib/services/medico.service';
 
 interface Step1Props {
     citaData: {
@@ -17,12 +19,30 @@ interface Step1Props {
 export function Step1_Resumen({ citaData }: Step1Props) {
     const { cita, paciente, empleado, caso } = citaData;
     const datosPsico = (caso as any)?.datos_extra?.Psicosocial || (caso as any)?.datosExtra?.Psicosocial;
+    const [historial, setHistorial] = useState<any[]>([]);
+    const [loadingHistorial, setLoadingHistorial] = useState(true);
 
-    // Mock history for preview
-    const mockHistorial: any[] = [
-        { fechaAtencion: new Date(Date.now() - 86400000 * 30).toISOString(), diagnosticoPrincipal: "Gripe común con fiebre persistente.", estadoClinico: 'BIEN' },
-        { fechaAtencion: new Date(Date.now() - 86400000 * 60).toISOString(), diagnosticoPrincipal: "Control rutinario de presión arterial.", estadoClinico: 'BIEN' }
-    ];
+    useEffect(() => {
+        const idPaciente = paciente.id_paciente ?? paciente.id;
+        if (!idPaciente) {
+            setLoadingHistorial(false);
+            return;
+        }
+        MedicoService.getCitasPorPaciente(idPaciente)
+            .then((data: any[]) => {
+                const atendidas = (data || []).map(c => ({
+                    fechaAtencion: c.fecha_cita ?? c.fechaCita,
+                    medico_nombre: c.medico_nombre,
+                    diagnosticoPrincipal: c.motivo_resumen ?? c.motivoResumen,
+                    estadoClinico: c.estado_cita === 'FINALIZADA' || c.estadoCita === 'FINALIZADA' ? 'BIEN' : 'REGULAR',
+                }));
+                setHistorial(atendidas);
+            })
+            .catch(() => {
+                setHistorial([]);
+            })
+            .finally(() => setLoadingHistorial(false));
+    }, [paciente.id_paciente, paciente.id]);
 
     return (
         <div className="space-y-8 animate-in fade-in slide-in-from-bottom-2 duration-500">
@@ -105,7 +125,13 @@ export function Step1_Resumen({ citaData }: Step1Props) {
                    <Badge className="bg-emerald-50 text-emerald-700 border-emerald-200">CASO ACTIVO</Badge>
                 </div>
                 <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
-                    <AtencionHistorial atenciones={mockHistorial} />
+                    {loadingHistorial ? (
+                        <div className="flex items-center justify-center h-20">
+                            <div className="h-5 w-5 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+                        </div>
+                    ) : (
+                        <AtencionHistorial atenciones={historial} />
+                    )}
                 </div>
             </div>
         </div>

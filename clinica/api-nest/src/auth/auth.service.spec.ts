@@ -64,9 +64,13 @@ describe('AuthService', () => {
     });
 
     describe('validateSSOToken (JIT Provisioning)', () => {
+        beforeEach(() => {
+            process.env.JWT_SSO_SECRET = 'test-secret';
+        });
+
         it('debe aprovisionar un usuario nuevo si no existe en la BD local', async () => {
             const mockTicket = 'valid-ticket';
-            const mockPayload = { carnet: '9999', name: 'Nuevo Usuario' };
+            const mockPayload = { carnet: '9999', name: 'Nuevo Usuario', type: 'SSO_PORTAL' };
             
             mockJwtService.verifyAsync.mockResolvedValue(mockPayload);
             mockDbService.query.mockResolvedValueOnce([]); // No existe

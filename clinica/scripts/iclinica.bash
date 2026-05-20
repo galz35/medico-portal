@@ -28,21 +28,22 @@ URL_PORTAL="https://$DOMINIO/portal"
 URL_CLINICA="https://$DOMINIO/portal/clinica"
 API_PUBLIC_PORTAL="https://$DOMINIO/api-portal"
 
-JWT_SECRET='fnS8JHYuYjgyKZzHDXvfzwmK0LVcE0S3jq6HFB14wu/rG+In7Lmv24K4KndjDoyRPZLKhPn7j9PAkk/rcWZq7w=='
-COOKIE_SECRET_CLINICA='clinica-dev-secret-2026'
+JWT_SECRET="${JWT_SECRET:-}"
+COOKIE_SECRET_CLINICA="${COOKIE_SECRET_CLINICA:-}"
+JWT_SSO_SECRET="${JWT_SSO_SECRET:-}"
 
 MSSQL_HOST="${MSSQL_HOST:-localhost}"
 MSSQL_PORT="${MSSQL_PORT:-1433}"
 MSSQL_USER="${MSSQL_USER:-sa}"
-MSSQL_PASSWORD="${MSSQL_PASSWORD:-TuPasswordFuerte!2026}"
+MSSQL_PASSWORD="${MSSQL_PASSWORD:-}"
 MSSQL_ENCRYPT="${MSSQL_ENCRYPT:-false}"
 MSSQL_TRUST_CERT="${MSSQL_TRUST_CERT:-true}"
 DB_CLINICA="${DB_CLINICA:-medicoBD}"
 
-SMTP_HOST="smtp.gmail.com"
-SMTP_PORT_SSL="465"
-SMTP_USER="rrrhh1930@gmail.com"
-SMTP_PASSWORD='cqvekscikoptijvq'
+SMTP_HOST="${SMTP_HOST:-smtp.gmail.com}"
+SMTP_PORT_SSL="${SMTP_PORT_SSL:-465}"
+SMTP_USER="${SMTP_USER:-}"
+SMTP_PASSWORD="${SMTP_PASSWORD:-}"
 
 MOD_FRONTEND_REL=""
 MOD_BACKEND_REL="clinica/api-nest"
@@ -265,6 +266,7 @@ exportar_env_backend() {
   export MSSQL_TRUST_CERT="$MSSQL_TRUST_CERT"
   export JWT_SECRET="$JWT_SECRET"
   export COOKIE_SECRET="$COOKIE_SECRET_CLINICA"
+  export JWT_SSO_SECRET="$JWT_SSO_SECRET"
   export PORT="$MOD_PORT"
   export PORTAL_API_URL="$API_PUBLIC_PORTAL"
   export CORS_ORIGIN="https://$DOMINIO"
@@ -273,6 +275,18 @@ exportar_env_backend() {
   export MAIL_USER="$SMTP_USER"
   export MAIL_PASSWORD="$SMTP_PASSWORD"
   export MAIL_FROM="Clinica Claroni <${SMTP_USER}>"
+
+  if [ -z "$JWT_SECRET" ]; then
+    echo "ADVERTENCIA: JWT_SECRET no esta configurado. Usando valor del script (inseguro)."
+  fi
+  if [ -z "$JWT_SSO_SECRET" ]; then
+    echo "ERROR: JWT_SSO_SECRET no esta configurado. El SSO fallara en produccion."
+    exit 1
+  fi
+  if [ -z "$MSSQL_PASSWORD" ]; then
+    echo "ERROR: MSSQL_PASSWORD no esta configurado."
+    exit 1
+  fi
 }
 
 build_backend() {
