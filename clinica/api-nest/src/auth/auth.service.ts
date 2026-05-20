@@ -84,9 +84,9 @@ export class AuthService {
 
     async validatePortalSession(sid: string) {
         if (!sid) return null;
-        
+
         try {
-            const portalUrl = process.env.PORTAL_API_URL || 'http://localhost:3110';
+            const portalUrl = (process.env.PORTAL_API_URL || 'http://localhost:3120').replace(/\/+$/, '');
             const response = await axios.post(`${portalUrl}/api/auth/introspect`, {}, {
                 headers: {
                     Cookie: `portal_sid=${sid}`
